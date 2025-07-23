@@ -21,12 +21,12 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/markets" className="text-gray-400 hover:text-accent transition-colors">
+                <Link href="#" className="text-gray-400 hover:text-accent transition-colors">
                   Markets
                 </Link>
               </li>
               <li>
-                <Link href="/stake" className="text-gray-400 hover:text-accent transition-colors">
+                <Link href="#" className="text-gray-400 hover:text-accent transition-colors">
                   Stake
                 </Link>
               </li>
@@ -36,12 +36,12 @@ const Footer = () => {
             <h4 className="text-lg font-bold mb-4">Resources</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/docs" className="text-gray-400 hover:text-accent transition-colors">
+                <Link href="#" className="text-gray-400 hover:text-accent transition-colors">
                   Documentation
                 </Link>
               </li>
               <li>
-                <Link href="/faq" className="text-gray-400 hover:text-accent transition-colors">
+                <Link href="#" className="text-gray-400 hover:text-accent transition-colors">
                   FAQ
                 </Link>
               </li>

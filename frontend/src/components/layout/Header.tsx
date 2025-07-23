@@ -13,14 +13,17 @@ const Header = () => {
     <header className="bg-secondary py-4 border-b border-gray-800">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center space-x-4">
-          <Link href="/" className="flex items-center space-x-2">
-            <Image 
-              src="/cirqa-logo.svg" 
-              alt="Cirqa Logo" 
-              width={120} 
-              height={40} 
-              priority
-            />
+          <Link href="/" className="flex items-center">
+            <div className="flex items-center">
+              <Image 
+                src="/cirqa-logo.svg" 
+                alt="Cirqa Logo" 
+                width={40} 
+                height={40} 
+                priority
+              />
+              <span className="text-white font-bold text-xl ml-1">Cirqa</span>
+            </div>
           </Link>
         </div>
         <div className="flex items-center space-x-4">

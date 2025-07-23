@@ -9,11 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "ethers": "^6.13.5",
     "next": "15.4.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "thirdweb": "^5.95.2",
-    "ethers": "^6.13.5"
+    "react-icons": "^5.5.0",
+    "thirdweb": "^5.95.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
