@@ -1,103 +1,141 @@
 import Image from "next/image";
+import Link from "next/link";
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      
+      {/* Hero Section */}
+      <main className="flex-grow">
+        <section className="py-20 px-4">
+          <div className="container mx-auto text-center">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6">LENDING PROTOCOL FOR RWAs</h1>
+            <p className="text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto">
+              Seamless and secure lending, borrowing, and yield for crypto native RWA on KiiChain with Cirqa.
+            </p>
+            <Link href="/app" className="btn-primary text-lg py-3 px-8">
+              Launch App
+            </Link>
+          </div>
+        </section>
+        
+        {/* Stats Section */}
+        <section className="py-16 bg-secondary">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+              <div>
+                <h3 className="text-3xl font-bold mb-2">$0+</h3>
+                <p className="text-gray-400">Total Value Locked</p>
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold mb-2">0+</h3>
+                <p className="text-gray-400">Active Users</p>
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold mb-2">0+</h3>
+                <p className="text-gray-400">Total Transactions</p>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        {/* Features Section */}
+        <section className="py-20 px-4">
+          <div className="container mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-16">CORE FEATURES</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+              <div className="card p-6">
+                <h3 className="text-xl font-bold mb-4">Decentralized Lending and Borrowing</h3>
+                <p className="text-gray-400">
+                  Users can lend and borrow cryptocurrencies through liquidity pools, earning interest or using crypto assets as collateral.
+                </p>
+              </div>
+              <div className="card p-6">
+                <h3 className="text-xl font-bold mb-4">Algorithmic Interest Rates</h3>
+                <p className="text-gray-400">
+                  Cirqa uses an algorithmic model to set interest rates in real-time based on the supply and demand for each asset in the market.
+                </p>
+              </div>
+              <div className="card p-6">
+                <h3 className="text-xl font-bold mb-4">Over-collateralization</h3>
+                <p className="text-gray-400">
+                  Borrowers provide collateral that exceeds the value of the loan. This ensures that the protocol remains solvent even if the borrower fails to repay.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        {/* Security Section */}
+        <section className="py-20 px-4 bg-secondary">
+          <div className="container mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-4">AUDITED AND VERIFIED</h2>
+            <p className="text-xl text-gray-400 mb-12 max-w-3xl mx-auto">
+              THE MOST SECURE MONEY PROTOCOL
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+              <div className="card p-6">
+                <h3 className="text-xl font-bold mb-4">Security Audits</h3>
+                <p className="text-gray-400">
+                  Our team of specialists has meticulously audited the Cirqa smart contracts, ensuring a secure and reliable platform you can trust.
+                </p>
+              </div>
+              <div className="card p-6">
+                <h3 className="text-xl font-bold mb-4">Open Source</h3>
+                <p className="text-gray-400">
+                  The smart contracts are open source, providing complete transparency and allowing the community to verify and contribute to their security.
+                </p>
+              </div>
+              <div className="card p-6">
+                <h3 className="text-xl font-bold mb-4">Decentralized</h3>
+                <p className="text-gray-400">
+                  The protocol is decentralized, reducing the risk of single points of failure and promoting trust and inclusivity.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        {/* How It Works Section */}
+        <section className="py-20 px-4">
+          <div className="container mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-16">HOW IT WORKS</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+              <div className="card p-6">
+                <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">1</div>
+                <h3 className="text-xl font-bold mb-4">Supply Assets</h3>
+                <p className="text-gray-400">
+                  Supply your assets to the protocol and contribute to the liquidity pool.
+                </p>
+              </div>
+              <div className="card p-6">
+                <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">2</div>
+                <h3 className="text-xl font-bold mb-4">Earn Interest</h3>
+                <p className="text-gray-400">
+                  Earn interest on your supplied assets and watch your savings grow.
+                </p>
+              </div>
+              <div className="card p-6">
+                <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">3</div>
+                <h3 className="text-xl font-bold mb-4">Borrow Assets</h3>
+                <p className="text-gray-400">
+                  Borrow assets easily and securely using your supplied assets as collateral.
+                </p>
+              </div>
+            </div>
+            <div className="mt-12">
+              <Link href="/app" className="btn-primary text-lg py-3 px-8">
+                Get Started
+              </Link>
+            </div>
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      
+      <Footer />
     </div>
   );
 }
