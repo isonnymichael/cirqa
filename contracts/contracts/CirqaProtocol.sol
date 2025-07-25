@@ -3,11 +3,10 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 import "./ICirqaToken.sol";
 
 contract CirqaProtocol is Ownable {
-    using SafeMath for uint256;
 
     ICirqaToken public cirqaToken;
 
@@ -108,8 +107,8 @@ contract CirqaProtocol is Ownable {
         if (_withUpdate) {
             massUpdateAssets();
         }
-        uint256 lastRewardTime = block.timestamp > assetInfo.length > 0 ? block.timestamp : assetInfo[0].lastRewardTime;
-        totalAllocPoint = totalAllocPoint.add(_allocPoint);
+        uint256 lastRewardTime = block.timestamp;
+        totalAllocPoint = totalAllocPoint + _allocPoint;
         assetInfo.push(AssetInfo({
             asset: IERC20(_asset),
             allocPoint: _allocPoint,
@@ -130,7 +129,7 @@ contract CirqaProtocol is Ownable {
         if (_withUpdate) {
             massUpdateAssets();
         }
-        totalAllocPoint = totalAllocPoint.sub(assetInfo[_pid].allocPoint).add(_allocPoint);
+        totalAllocPoint = totalAllocPoint - assetInfo[_pid].allocPoint + _allocPoint;
         assetInfo[_pid].allocPoint = _allocPoint;
     }
 
@@ -164,9 +163,9 @@ contract CirqaProtocol is Ownable {
             asset.lastRewardTime = block.timestamp;
             return;
         }
-        uint256 multiplier = block.timestamp.sub(asset.lastRewardTime);
-        uint256 cirqaReward = multiplier.mul(cirqaPerSecond).mul(asset.allocPoint).div(totalAllocPoint);
-        asset.accCirqaPerShare = asset.accCirqaPerShare.add(cirqaReward.mul(1e12).div(asset.totalPoints));
+        uint256 multiplier = block.timestamp - asset.lastRewardTime;
+        uint256 cirqaReward = multiplier * cirqaPerSecond * asset.allocPoint / totalAllocPoint;
+        asset.accCirqaPerShare = asset.accCirqaPerShare + (cirqaReward * 1e12 / asset.totalPoints);
         asset.lastRewardTime = block.timestamp;
     }
 
@@ -187,11 +186,11 @@ contract CirqaProtocol is Ownable {
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accCirqaPerShare = asset.accCirqaPerShare;
         if (block.timestamp > asset.lastRewardTime && asset.totalPoints != 0) {
-            uint256 multiplier = block.timestamp.sub(asset.lastRewardTime);
-            uint256 cirqaReward = multiplier.mul(cirqaPerSecond).mul(asset.allocPoint).div(totalAllocPoint);
-            accCirqaPerShare = accCirqaPerShare.add(cirqaReward.mul(1e12).div(asset.totalPoints));
+            uint256 multiplier = block.timestamp - asset.lastRewardTime;
+            uint256 cirqaReward = multiplier * cirqaPerSecond * asset.allocPoint / totalAllocPoint;
+            accCirqaPerShare = accCirqaPerShare + (cirqaReward * 1e12 / asset.totalPoints);
         }
-        return user.points.mul(accCirqaPerShare).div(1e12).sub(user.rewardDebt);
+        return user.points * accCirqaPerShare / 1e12 - user.rewardDebt;
     }
 
     /*
@@ -209,9 +208,9 @@ contract CirqaProtocol is Ownable {
     function _updateUser(uint256 _pid, address _user) internal {
         updateAsset(_pid);
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 pending = user.points.mul(assetInfo[_pid].accCirqaPerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.points * assetInfo[_pid].accCirqaPerShare / 1e12 - user.rewardDebt;
         if (pending > 0) {
-            cirqaToken.transfer(_user, pending);
+            cirqaToken.mint(_user, pending);
             emit Claim(_user, pending);
         }
     }
@@ -227,9 +226,9 @@ contract CirqaProtocol is Ownable {
         _updateUser(_pid, _user);
         AssetInfo storage asset = assetInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        asset.totalPoints = asset.totalPoints.sub(user.points).add(_newPoints);
+        asset.totalPoints = asset.totalPoints - user.points + _newPoints;
         user.points = _newPoints;
-        user.rewardDebt = _newPoints.mul(asset.accCirqaPerShare).div(1e12);
+        user.rewardDebt = _newPoints * asset.accCirqaPerShare / 1e12;
     }
 
     /*
@@ -246,7 +245,7 @@ contract CirqaProtocol is Ownable {
     function supply(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
         UserInfo storage user = userInfo[pid][msg.sender];
-        uint256 newPoints = user.points.add(_amount);
+        uint256 newPoints = user.points + _amount;
         _updatePoints(pid, msg.sender, newPoints);
         assetInfo[pid].asset.transferFrom(msg.sender, address(this), _amount);
         emit Supply(msg.sender, pid, _amount);
@@ -261,7 +260,7 @@ contract CirqaProtocol is Ownable {
         uint256 pid = assetId[_asset] - 1;
         UserInfo storage user = userInfo[pid][msg.sender];
         require(user.points >= _amount, "withdraw: not good");
-        uint256 newPoints = user.points.sub(_amount);
+        uint256 newPoints = user.points - _amount;
         _updatePoints(pid, msg.sender, newPoints);
         assetInfo[pid].asset.transfer(msg.sender, _amount);
         emit Withdraw(msg.sender, pid, _amount);
@@ -275,8 +274,8 @@ contract CirqaProtocol is Ownable {
      */
     function borrow(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
-        uint256 feeAmount = _amount.mul(protocolFeeBps).div(10000);
-        uint256 amountToUser = _amount.sub(feeAmount);
+        uint256 feeAmount = _amount * protocolFeeBps / 10000;
+        uint256 amountToUser = _amount - feeAmount;
 
         if (feeAmount > 0) {
             assetInfo[pid].asset.transfer(protocolFeeRecipient, feeAmount);
@@ -285,7 +284,7 @@ contract CirqaProtocol is Ownable {
 
         UserInfo storage user = userInfo[pid][msg.sender];
         // Points are based on the original borrowed amount to reflect the full economic activity
-        uint256 newPoints = user.points.add(_amount.div(2));
+        uint256 newPoints = user.points + (_amount / 2);
         _updatePoints(pid, msg.sender, newPoints);
 
         // Transfer the remaining amount to the user
@@ -303,9 +302,9 @@ contract CirqaProtocol is Ownable {
     function repay(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
         UserInfo storage user = userInfo[pid][msg.sender];
-        uint256 borrowedAmount = user.points.mul(2); // Re-calculate borrowed amount from points
+        uint256 borrowedAmount = user.points * 2; // Re-calculate borrowed amount from points
         require(borrowedAmount >= _amount, "repay: not good");
-        uint256 newPoints = user.points.sub(_amount.div(2));
+        uint256 newPoints = user.points - (_amount / 2);
         _updatePoints(pid, msg.sender, newPoints);
         assetInfo[pid].asset.transferFrom(msg.sender, address(this), _amount);
         emit Repay(msg.sender, pid, _amount);
