@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
 import { FaLock, FaChartLine, FaCode } from "react-icons/fa";
 import { RiMoneyDollarCircleFill, RiExchangeDollarFill, RiHandCoinFill } from "react-icons/ri";
 import { MdSecurity, MdOutlineVerified, MdOutlinePublic } from "react-icons/md";
@@ -203,7 +202,7 @@ export default function Home() {
         </div>
       </div>
       
-      <Footer />
+      
     </div>
   );
 }
