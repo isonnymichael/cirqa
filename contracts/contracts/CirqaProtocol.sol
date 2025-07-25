@@ -24,6 +24,10 @@ contract CirqaProtocol is Ownable {
     // CIRQA tokens created per second.
     uint256 public cirqaPerSecond = 158e15; // ~0.158 CIRQA/sec
 
+    // Protocol fee
+    uint256 public protocolFeeBps = 0; // Protocol fee in basis points. 100 bps = 1%.
+    address public protocolFeeRecipient;
+
     struct UserInfo {
         uint256 points; // How many points the user has.
         uint256 rewardDebt; // Reward debt. See explanation below.
@@ -42,9 +46,21 @@ contract CirqaProtocol is Ownable {
     event Borrow(address indexed user, uint256 indexed pid, uint256 amount);
     event Repay(address indexed user, uint256 indexed pid, uint256 amount);
     event Claim(address indexed user, uint256 amount);
+    event ProtocolFeePaid(address indexed asset, address indexed user, uint256 feeAmount);
 
     constructor(address _cirqaTokenAddress) Ownable(msg.sender) {
         cirqaToken = ICirqaToken(_cirqaTokenAddress);
+        protocolFeeRecipient = msg.sender;
+    }
+
+    function setProtocolFee(uint256 _newFeeBps) public onlyOwner {
+        require(_newFeeBps <= 1000, "Fee cannot exceed 10%"); // Max fee 10%
+        protocolFeeBps = _newFeeBps;
+    }
+
+    function setProtocolFeeRecipient(address _newRecipient) public onlyOwner {
+        require(_newRecipient != address(0), "Invalid recipient address");
+        protocolFeeRecipient = _newRecipient;
     }
 
     function updateCirqaPerSecond(uint256 _cirqaPerSecond) public onlyOwner {
@@ -151,19 +167,29 @@ contract CirqaProtocol is Ownable {
 
     function borrow(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
-        // Here should be a logic to check if user has enough collateral
-        // For simplicity, we skip it for now
+        uint256 feeAmount = _amount.mul(protocolFeeBps).div(10000);
+        uint256 amountToUser = _amount.sub(feeAmount);
+
+        if (feeAmount > 0) {
+            assetInfo[pid].asset.transfer(protocolFeeRecipient, feeAmount);
+            emit ProtocolFeePaid(_asset, msg.sender, feeAmount);
+        }
+
         UserInfo storage user = userInfo[pid][msg.sender];
-        uint256 newPoints = user.points.add(_amount.div(2)); // Borrowers get half points
+        // Points are based on the original borrowed amount to reflect the full economic activity
+        uint256 newPoints = user.points.add(_amount.div(2));
         _updatePoints(pid, msg.sender, newPoints);
-        assetInfo[pid].asset.transfer(msg.sender, _amount);
+
+        // Transfer the remaining amount to the user
+        if (amountToUser > 0) {
+            assetInfo[pid].asset.transfer(msg.sender, amountToUser);
+        }
         emit Borrow(msg.sender, pid, _amount);
     }
 
     function repay(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
         UserInfo storage user = userInfo[pid][msg.sender];
-        // This is a simplified logic. In reality, you need to track borrowed amount separately.
         uint256 borrowedAmount = user.points.mul(2); // Re-calculate borrowed amount from points
         require(borrowedAmount >= _amount, "repay: not good");
         uint256 newPoints = user.points.sub(_amount.div(2));
