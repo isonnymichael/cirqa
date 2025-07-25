@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react';
+import { useActiveAccount, useActiveWalletChain, useReadContract } from 'thirdweb/react';
 import { kiiTestnet } from '@/lib/chain';
+import { cirqaTokenContract, cirqaProtocolContract } from '@/lib/contracts';
+import { formatUnits } from 'ethers';
 
 // Components for the lending/borrowing app
 import MarketOverview from '@/components/app/MarketOverview';
@@ -13,6 +15,8 @@ export default function AppPage() {
   const [activeTab, setActiveTab] = useState('supply');
   const account = useActiveAccount();
   const chain = useActiveWalletChain();
+
+
 
   if (!account || (chain && chain.id !== kiiTestnet.id)) {
     return (
