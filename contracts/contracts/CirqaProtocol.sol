@@ -48,48 +48,61 @@ contract CirqaProtocol is Ownable {
     event Claim(address indexed user, uint256 amount);
     event ProtocolFeePaid(address indexed asset, address indexed user, uint256 feeAmount);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Constructor
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @notice Initializes the contract, setting the CIRQA token address and the initial fee recipient.
+     * @param _cirqaTokenAddress The address of the CIRQA token contract.
+     */
     constructor(address _cirqaTokenAddress) Ownable(msg.sender) {
         cirqaToken = ICirqaToken(_cirqaTokenAddress);
         protocolFeeRecipient = msg.sender;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Functions
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @notice Sets the protocol fee percentage.
+     * @dev The fee is in basis points (bps). For example, 100 bps = 1%.
+     * @param _newFeeBps The new fee in basis points. Cannot exceed 1000 (10%).
+     */
     function setProtocolFee(uint256 _newFeeBps) public onlyOwner {
         require(_newFeeBps <= 1000, "Fee cannot exceed 10%"); // Max fee 10%
         protocolFeeBps = _newFeeBps;
     }
 
+    /**
+     * @notice Updates the address that receives protocol fees.
+     * @param _newRecipient The new address for the fee recipient.
+     */
     function setProtocolFeeRecipient(address _newRecipient) public onlyOwner {
         require(_newRecipient != address(0), "Invalid recipient address");
         protocolFeeRecipient = _newRecipient;
     }
 
+    /**
+     * @notice Updates the rate of CIRQA rewards distributed per second across all pools.
+     * @param _cirqaPerSecond The new amount of CIRQA tokens per second (with 18 decimals).
+     */
     function updateCirqaPerSecond(uint256 _cirqaPerSecond) public onlyOwner {
         massUpdateAssets();
         cirqaPerSecond = _cirqaPerSecond;
     }
 
-    function massUpdateAssets() public {
-        uint256 length = assetInfo.length;
-        for (uint256 pid = 0; pid < length; ++pid) {
-            updateAsset(pid);
-        }
-    }
-
-    function updateAsset(uint256 _pid) public {
-        AssetInfo storage asset = assetInfo[_pid];
-        if (block.timestamp <= asset.lastRewardTime) {
-            return;
-        }
-        if (asset.totalPoints == 0) {
-            asset.lastRewardTime = block.timestamp;
-            return;
-        }
-        uint256 multiplier = block.timestamp.sub(asset.lastRewardTime);
-        uint256 cirqaReward = multiplier.mul(cirqaPerSecond).mul(asset.allocPoint).div(totalAllocPoint);
-        asset.accCirqaPerShare = asset.accCirqaPerShare.add(cirqaReward.mul(1e12).div(asset.totalPoints));
-        asset.lastRewardTime = block.timestamp;
-    }
-
+    /**
+     * @notice Adds a new asset pool to the protocol.
+     * @param _allocPoint The allocation points for the new pool, determining its share of CIRQA rewards.
+     * @param _asset The address of the asset token.
+     * @param _withUpdate If true, updates all existing pools' rewards before adding the new one.
+     */
     function add(uint256 _allocPoint, address _asset, bool _withUpdate) public onlyOwner {
         require(assetId[_asset] == 0, "Asset already added.");
         if (_withUpdate) {
@@ -107,6 +120,12 @@ contract CirqaProtocol is Ownable {
         assetId[_asset] = assetInfo.length;
     }
 
+    /**
+     * @notice Updates the allocation points of an existing asset pool.
+     * @param _pid The ID of the pool to update.
+     * @param _allocPoint The new allocation points for the pool.
+     * @param _withUpdate If true, updates all existing pools' rewards before setting the new value.
+     */
     function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
             massUpdateAssets();
@@ -115,6 +134,54 @@ contract CirqaProtocol is Ownable {
         assetInfo[_pid].allocPoint = _allocPoint;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Public Update Functions
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @notice Updates the reward variables for all asset pools.
+     * @dev This is a public function that can be called to ensure all pools are up-to-date.
+     */
+    function massUpdateAssets() public {
+        uint256 length = assetInfo.length;
+        for (uint256 pid = 0; pid < length; ++pid) {
+            updateAsset(pid);
+        }
+    }
+
+    /**
+     * @notice Updates the reward variables of a single asset pool.
+     * @param _pid The ID of the pool to update.
+     */
+    function updateAsset(uint256 _pid) public {
+        AssetInfo storage asset = assetInfo[_pid];
+        if (block.timestamp <= asset.lastRewardTime) {
+            return;
+        }
+        if (asset.totalPoints == 0) {
+            asset.lastRewardTime = block.timestamp;
+            return;
+        }
+        uint256 multiplier = block.timestamp.sub(asset.lastRewardTime);
+        uint256 cirqaReward = multiplier.mul(cirqaPerSecond).mul(asset.allocPoint).div(totalAllocPoint);
+        asset.accCirqaPerShare = asset.accCirqaPerShare.add(cirqaReward.mul(1e12).div(asset.totalPoints));
+        asset.lastRewardTime = block.timestamp;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | View Functions
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @notice Calculates the amount of pending CIRQA rewards for a user in a specific pool.
+     * @param _pid The ID of the pool.
+     * @param _user The address of the user.
+     * @return The amount of pending CIRQA tokens.
+     */
     function pendingCirqa(uint256 _pid, address _user) external view returns (uint256) {
         AssetInfo storage asset = assetInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
@@ -127,6 +194,18 @@ contract CirqaProtocol is Ownable {
         return user.points.mul(accCirqaPerShare).div(1e12).sub(user.rewardDebt);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Core Logic (Internal Functions)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @notice Updates a user's reward state and transfers any pending CIRQA.
+     * @dev This function is called before any action that changes a user's points.
+     * @param _pid The ID of the pool.
+     * @param _user The address of the user.
+     */
     function _updateUser(uint256 _pid, address _user) internal {
         updateAsset(_pid);
         UserInfo storage user = userInfo[_pid][_user];
@@ -137,6 +216,13 @@ contract CirqaProtocol is Ownable {
         }
     }
 
+    /**
+     * @notice Updates a user's points and reward debt.
+     * @dev This is the core function for handling changes in a user's stake.
+     * @param _pid The ID of the pool.
+     * @param _user The address of the user.
+     * @param _newPoints The new total points for the user.
+     */
     function _updatePoints(uint256 _pid, address _user, uint256 _newPoints) internal {
         _updateUser(_pid, _user);
         AssetInfo storage asset = assetInfo[_pid];
@@ -146,6 +232,17 @@ contract CirqaProtocol is Ownable {
         user.rewardDebt = _newPoints.mul(asset.accCirqaPerShare).div(1e12);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | User-Facing Functions
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @notice Supplies an asset to a pool to earn rewards.
+     * @param _asset The address of the asset to supply.
+     * @param _amount The amount of the asset to supply.
+     */
     function supply(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
         UserInfo storage user = userInfo[pid][msg.sender];
@@ -155,6 +252,11 @@ contract CirqaProtocol is Ownable {
         emit Supply(msg.sender, pid, _amount);
     }
 
+    /**
+     * @notice Withdraws an asset from a pool.
+     * @param _asset The address of the asset to withdraw.
+     * @param _amount The amount of the asset to withdraw.
+     */
     function withdraw(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
         UserInfo storage user = userInfo[pid][msg.sender];
@@ -165,6 +267,12 @@ contract CirqaProtocol is Ownable {
         emit Withdraw(msg.sender, pid, _amount);
     }
 
+    /**
+     * @notice Borrows an asset from a pool.
+     * @dev A protocol fee is taken from the borrowed amount.
+     * @param _asset The address of the asset to borrow.
+     * @param _amount The amount of the asset to borrow.
+     */
     function borrow(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
         uint256 feeAmount = _amount.mul(protocolFeeBps).div(10000);
@@ -187,6 +295,11 @@ contract CirqaProtocol is Ownable {
         emit Borrow(msg.sender, pid, _amount);
     }
 
+    /**
+     * @notice Repays a borrowed asset.
+     * @param _asset The address of the asset to repay.
+     * @param _amount The amount of the asset to repay.
+     */
     function repay(address _asset, uint256 _amount) external {
         uint256 pid = assetId[_asset] - 1;
         UserInfo storage user = userInfo[pid][msg.sender];
@@ -198,6 +311,10 @@ contract CirqaProtocol is Ownable {
         emit Repay(msg.sender, pid, _amount);
     }
 
+    /**
+     * @notice Claims pending CIRQA rewards for the caller from a specific pool.
+     * @param _pid The ID of the pool to claim from.
+     */
     function claimReward(uint256 _pid) public {
         _updateUser(_pid, msg.sender);
     }
