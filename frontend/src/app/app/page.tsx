@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
+import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react';
+import { kiiTestnet } from '@/lib/chain';
 
 // Components for the lending/borrowing app
 import MarketOverview from '@/components/app/MarketOverview';
@@ -10,6 +11,19 @@ import UserStats from '@/components/app/UserStats';
 
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState('supply');
+  const account = useActiveAccount();
+  const chain = useActiveWalletChain();
+
+  if (!account || (chain && chain.id !== kiiTestnet.id)) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-4">Connect Your Wallet</h1>
+          <p className="text-gray-400">Please connect your wallet and switch to the Kii Testnet to use the app.</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background py-8">
