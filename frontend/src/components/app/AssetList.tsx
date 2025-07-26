@@ -1,114 +1,140 @@
 'use client';
 
+'use client';
+
 import React from 'react';
-import Image from 'next/image';
+import Spinner from '@/app/Spinner';
+import { useReadContract, useActiveAccount } from 'thirdweb/react';
+import { getContract } from 'thirdweb';
+import { formatUnits } from 'ethers';
+import { cirqaProtocolContract } from '@/lib/contracts';
+import { kiiTestnet } from '@/lib/chain';
+import { Abi } from 'viem';
+
+const erc20Abi = [
+  { "constant": true, "inputs": [], "name": "name", "outputs": [{ "name": "", "type": "string" }], "payable": false, "stateMutability": "view", "type": "function" },
+  { "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "payable": false, "stateMutability": "view", "type": "function" },
+  { "constant": true, "inputs": [{ "name": "_owner", "type": "address" }], "name": "balanceOf", "outputs": [{ "name": "balance", "type": "uint256" }], "payable": false, "stateMutability": "view", "type": "function" },
+  { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "payable": false, "stateMutability": "view", "type": "function" }
+];
 
 type AssetListProps = {
   type: 'supply' | 'borrow';
 };
 
-type Asset = {
-  id: string;
-  name: string;
-  symbol: string;
-  apy: string;
-  walletBalance: string;
-  supplied?: string;
-  borrowed?: string;
-  price: string;
-  liquidationThreshold?: string;
-  available?: string;
+const formatDisplayValue = (value: any, decimals = 18, prefix = '', suffix = '') => {
+  if (value === undefined || value === null) return '...';
+  const formatted = parseFloat(formatUnits(value, decimals)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${prefix}${formatted}${suffix}`;
+};
+
+const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => {
+  const account = useActiveAccount();
+
+  const { data: assetInfo, isLoading: isAssetInfoLoading } = useReadContract({
+    contract: cirqaProtocolContract,
+    method: 'assetInfo',
+    params: [pid],
+  });
+
+  const assetAddress = assetInfo?.[0] ? assetInfo?.[0] : '';
+  const assetContract = assetAddress && typeof assetAddress === 'string' ? getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress, abi: erc20Abi as Abi }) : null;
+
+  // @ts-ignore
+  const { data: name, isLoading: isNameLoading } = useReadContract({ contract: assetContract, method: 'name', params: [], enabled: !!assetContract });
+  // @ts-ignore
+  const { data: symbol, isLoading: isSymbolLoading } = useReadContract({ contract: assetContract, method: 'symbol', params: [], enabled: !!assetContract });
+  // @ts-ignore
+  const { data: decimals, isLoading: isDecimalsLoading } = useReadContract({ contract: assetContract, method: 'decimals', params: [], enabled: !!assetContract });
+  // @ts-ignore
+  const { data: walletBalance, isLoading: isWalletBalanceLoading } = useReadContract({ contract: assetContract, method: 'balanceOf', params: account ? [account.address] : [], enabled: !!account && !!assetContract });
+
+  const { data: userInfo, isLoading: isUserInfoLoading } = useReadContract({
+    contract: cirqaProtocolContract,
+    method: 'userInfo',
+    params: account ? [pid, account.address] : [],
+    queryOptions: { enabled: !!account }, 
+  });
+
+  const supplied = userInfo?.[0];
+  const borrowed = userInfo?.[1];
+
+  const isLoading = isAssetInfoLoading || isNameLoading || isSymbolLoading || isDecimalsLoading || isWalletBalanceLoading || isUserInfoLoading;
+
+    if (isLoading) {
+    return (
+      <tr className="border-b border-gray-800">
+        <td colSpan={6} className="py-4 text-center">
+          <div className="flex justify-center">
+            <Spinner />
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="border-b border-gray-800">
+      <td className="py-4">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
+            {typeof symbol === 'string' ? symbol : '?'}
+          </div>
+          <div>
+            <div className="font-medium">{name}</div>
+            <div className="text-sm text-gray-400">{symbol}</div>
+          </div>
+        </div>
+      </td>
+      <td className="py-4">
+        <div className="font-medium">{'N/A'}</div>
+      </td>
+      <td className="py-4">
+        <div className="font-medium">{formatDisplayValue(walletBalance, decimals)}</div>
+        <div className="text-sm text-gray-400">{symbol}</div>
+      </td>
+      {type === 'supply' ? (
+        <>
+          <td className="py-4">
+            <div className="font-medium">{formatDisplayValue(supplied, decimals)}</div>
+            <div className="text-sm text-gray-400">{symbol}</div>
+          </td>
+          <td className="py-4">
+            <div className="flex items-center">
+              <div className="w-10 h-6 bg-gray-700 rounded-full relative mr-2">
+                <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-accent"></div>
+              </div>
+              <span className="text-sm">{'N/A'}</span>
+            </div>
+          </td>
+        </>
+      ) : (
+        <>
+          <td className="py-4">
+            <div className="font-medium">{formatDisplayValue(borrowed, decimals)}</div>
+            <div className="text-sm text-gray-400">{symbol}</div>
+          </td>
+          <td className="py-4">
+            <div className="font-medium">{'N/A'}</div>
+            <div className="text-sm text-gray-400">{symbol}</div>
+          </td>
+        </>
+      )}
+      <td className="py-4 text-right">
+        <button className="btn-primary hover:bg-accent hover:text-white transition-all">
+          {type === 'supply' ? 'Supply' : 'Borrow'}
+        </button>
+      </td>
+    </tr>
+  );
 };
 
 const AssetList = ({ type }: AssetListProps) => {
-  // Mock data for assets
-  const supplyAssets: Asset[] = [
-    {
-      id: '1',
-      name: 'USD Coin',
-      symbol: 'USDC',
-      apy: '3.5%',
-      walletBalance: '0.00',
-      supplied: '0.00',
-      price: '$1.00',
-      liquidationThreshold: '85%',
-    },
-    {
-      id: '2',
-      name: 'Tether',
-      symbol: 'USDT',
-      apy: '3.2%',
-      walletBalance: '0.00',
-      supplied: '0.00',
-      price: '$1.00',
-      liquidationThreshold: '85%',
-    },
-    {
-      id: '3',
-      name: 'Wrapped Bitcoin',
-      symbol: 'WBTC',
-      apy: '0.5%',
-      walletBalance: '0.00',
-      supplied: '0.00',
-      price: '$65,000.00',
-      liquidationThreshold: '80%',
-    },
-    {
-      id: '4',
-      name: 'Wrapped Ethereum',
-      symbol: 'WETH',
-      apy: '0.8%',
-      walletBalance: '0.00',
-      supplied: '0.00',
-      price: '$3,500.00',
-      liquidationThreshold: '82.5%',
-    },
-  ];
-
-  const borrowAssets: Asset[] = [
-    {
-      id: '1',
-      name: 'USD Coin',
-      symbol: 'USDC',
-      apy: '5.2%',
-      walletBalance: '0.00',
-      borrowed: '0.00',
-      available: '0.00',
-      price: '$1.00',
-    },
-    {
-      id: '2',
-      name: 'Tether',
-      symbol: 'USDT',
-      apy: '5.0%',
-      walletBalance: '0.00',
-      borrowed: '0.00',
-      available: '0.00',
-      price: '$1.00',
-    },
-    {
-      id: '3',
-      name: 'Wrapped Bitcoin',
-      symbol: 'WBTC',
-      apy: '2.5%',
-      walletBalance: '0.00',
-      borrowed: '0.00',
-      available: '0.00',
-      price: '$65,000.00',
-    },
-    {
-      id: '4',
-      name: 'Wrapped Ethereum',
-      symbol: 'WETH',
-      apy: '3.0%',
-      walletBalance: '0.00',
-      borrowed: '0.00',
-      available: '0.00',
-      price: '$3,500.00',
-    },
-  ];
-
-  const assets = type === 'supply' ? supplyAssets : borrowAssets;
+  const { data: assetsLength, isLoading } = useReadContract({
+    contract: cirqaProtocolContract,
+    method: 'getAssetsLength',
+    params: [],
+  });
 
   return (
     <div className="overflow-x-auto">
@@ -133,60 +159,21 @@ const AssetList = ({ type }: AssetListProps) => {
           </tr>
         </thead>
         <tbody>
-          {assets.map((asset) => (
-            <tr key={asset.id} className="border-b border-gray-800">
-              <td className="py-4">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
-                    {asset.symbol.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="font-medium">{asset.name}</div>
-                    <div className="text-sm text-gray-400">{asset.symbol}</div>
-                  </div>
+                    {isLoading ? (
+            <tr>
+              <td colSpan={6} className="text-center py-4">
+                <div className="flex justify-center">
+                  <Spinner />
                 </div>
               </td>
-              <td className="py-4">
-                <div className="font-medium">{asset.apy}</div>
-              </td>
-              <td className="py-4">
-                <div className="font-medium">{asset.walletBalance}</div>
-                <div className="text-sm text-gray-400">${asset.walletBalance}</div>
-              </td>
-              {type === 'supply' ? (
-                <>
-                  <td className="py-4">
-                    <div className="font-medium">{asset.supplied}</div>
-                    <div className="text-sm text-gray-400">${asset.supplied}</div>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex items-center">
-                      <div className="w-10 h-6 bg-gray-700 rounded-full relative mr-2">
-                        <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-accent"></div>
-                      </div>
-                      <span className="text-sm">{asset.liquidationThreshold}</span>
-                    </div>
-                  </td>
-                </>
-              ) : (
-                <>
-                  <td className="py-4">
-                    <div className="font-medium">{asset.borrowed}</div>
-                    <div className="text-sm text-gray-400">${asset.borrowed}</div>
-                  </td>
-                  <td className="py-4">
-                    <div className="font-medium">{asset.available}</div>
-                    <div className="text-sm text-gray-400">${asset.available}</div>
-                  </td>
-                </>
-              )}
-              <td className="py-4 text-right">
-                <button className="btn-primary hover:bg-accent hover:text-white transition-all">
-                  {type === 'supply' ? 'Supply' : 'Borrow'}
-                </button>
-              </td>
             </tr>
-          ))}
+          ) : Number(assetsLength || 0) === 0 ? (
+            <tr><td colSpan={6} className="text-center py-4">No assets available.</td></tr>
+          ) : (
+            [...Array(Number(assetsLength || 0))].map((_, i) => (
+              <AssetRow key={i} pid={BigInt(i)} type={type} />
+            ))
+          )}
         </tbody>
       </table>
     </div>

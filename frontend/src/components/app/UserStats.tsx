@@ -1,6 +1,9 @@
 'use client';
 
+'use client';
+
 import React from 'react';
+import Spinner from '@/app/Spinner';
 import { useActiveAccount, useReadContract } from 'thirdweb/react';
 import { formatUnits } from 'ethers';
 import { cirqaProtocolContract } from '@/lib/contracts';
@@ -29,17 +32,17 @@ const UserStats: React.FC = () => {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div className="card p-4">
         <div className="text-sm text-gray-400 mb-1">Total Supplied</div>
-        <div className="text-xl font-bold">{isGlobalUserInfoLoading ? 'Loading...' : formatDisplayValue(totalSupplied, 18, '$')}</div>
+                <div className="text-xl font-bold">{isGlobalUserInfoLoading ? <Spinner /> : formatDisplayValue(totalSupplied, 18, '$')}</div>
       </div>
       
       <div className="card p-4">
         <div className="text-sm text-gray-400 mb-1">Total Borrowed</div>
-        <div className="text-xl font-bold">{isGlobalUserInfoLoading ? 'Loading...' : formatDisplayValue(totalBorrowed, 18, '$')}</div>
+                <div className="text-xl font-bold">{isGlobalUserInfoLoading ? <Spinner /> : formatDisplayValue(totalBorrowed, 18, '$')}</div>
       </div>
       
       <div className="card p-4">
         <div className="text-sm text-gray-400 mb-1">CRQ Rewards</div>
-        <div className="text-xl font-bold">{isGlobalUserInfoLoading ? 'Loading...' : formatDisplayValue(totalPendingCirqa, 18, '', ' CRQ')}</div>
+                <div className="text-xl font-bold">{isGlobalUserInfoLoading ? <Spinner /> : formatDisplayValue(totalPendingCirqa, 18, '', ' CRQ')}</div>
       </div>
     </div>
   );
