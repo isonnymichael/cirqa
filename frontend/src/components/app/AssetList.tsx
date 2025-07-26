@@ -37,7 +37,7 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
     params: [pid],
   });
 
-  const assetAddress = assetInfo?.[0] ? assetInfo?.[0] : '';
+  const assetAddress = Array.isArray(assetInfo) && assetInfo[0] ? assetInfo[0] : '';
   const assetContract = assetAddress && typeof assetAddress === 'string' ? getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress, abi: erc20Abi as Abi }) : null;
 
   // @ts-ignore
@@ -56,8 +56,8 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
     queryOptions: { enabled: !!account }, 
   });
 
-  const supplied = userInfo?.[0];
-  const borrowed = userInfo?.[1];
+  const supplied = userInfo?.[0] ?? BigInt(0);
+  const borrowed = userInfo?.[1] ?? BigInt(0);
 
   const isLoading = isAssetInfoLoading || isNameLoading || isSymbolLoading || isDecimalsLoading || isWalletBalanceLoading || isUserInfoLoading;
 
@@ -136,6 +136,8 @@ const AssetList = ({ type }: AssetListProps) => {
     params: [],
   });
 
+  console.log(assetsLength);
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -159,7 +161,7 @@ const AssetList = ({ type }: AssetListProps) => {
           </tr>
         </thead>
         <tbody>
-                    {isLoading ? (
+          {isLoading ? (
             <tr>
               <td colSpan={6} className="text-center py-4">
                 <div className="flex justify-center">
