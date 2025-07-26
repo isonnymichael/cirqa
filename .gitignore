@@ -25,6 +25,7 @@ Icon?
 .vscode/
 *.iml
 *.bak
+.vercel/
 
 # Misc
 npm-debug.log*
