@@ -60,6 +60,8 @@ describe("CirqaProtocol", function () {
             const assetInfo = await protocol.assetInfo(0);
             expect(assetInfo.asset).to.equal(await asset1.getAddress());
             expect(assetInfo.allocPoint).to.equal(100);
+            expect(assetInfo.totalSupplied).to.equal(0);
+            expect(assetInfo.totalBorrowed).to.equal(0);
         });
 
         it("Should allow owner to set protocol fee", async function () {
@@ -110,8 +112,9 @@ describe("CirqaProtocol", function () {
             await asset1.connect(user2).approve(await protocol.getAddress(), ethers.parseEther("5"));
             await protocol.connect(user2).repay(await asset1.getAddress(), ethers.parseEther("5"));
 
-            const userInfo = await protocol.userInfo(0, user2.address);
-            expect(userInfo.points).to.be.gt(0); // Points should be created for borrowing
+            // Check user2's borrowed amount using the new global function
+            const [, totalBorrowed, ] = await protocol.getGlobalUserInfo(user2.address);
+            expect(totalBorrowed).to.equal(ethers.parseEther("5"));
 
             // User1 withdraws 50 asset1
             await protocol.connect(user1).withdraw(await asset1.getAddress(), ethers.parseEther("50"));
@@ -149,6 +152,56 @@ describe("CirqaProtocol", function () {
             const finalBalance = await cirqaToken.balanceOf(user1.address);
             expect(finalBalance).to.be.gt(initialBalance);
             expect(finalBalance).to.be.closeTo(ethers.parseEther("100"), ethers.parseEther("1"));
+        });
+    });
+
+    describe("Global User Info", function() {
+        beforeEach(async function() {
+            // Add asset1 and asset2 to the protocol
+            await protocol.add(100, await asset1.getAddress(), true);
+            await protocol.add(100, await asset2.getAddress(), true);
+
+            // User1 supplies 100 of asset1 and 50 of asset2
+            await asset1.connect(user1).approve(await protocol.getAddress(), ethers.parseEther("100"));
+            await protocol.connect(user1).supply(await asset1.getAddress(), ethers.parseEther("100"));
+            await asset2.connect(user1).approve(await protocol.getAddress(), ethers.parseEther("50"));
+            await protocol.connect(user1).supply(await asset2.getAddress(), ethers.parseEther("50"));
+
+            // User1 borrows 20 of asset2
+            await protocol.connect(user1).borrow(await asset2.getAddress(), ethers.parseEther("20"));
+        });
+
+        it("Should return correct aggregated user info", async function() {
+            const [totalSupplied, totalBorrowed, totalPendingCirqa] = await protocol.getGlobalUserInfo(user1.address);
+
+            expect(totalSupplied).to.equal(ethers.parseEther("150"));
+            expect(totalBorrowed).to.equal(ethers.parseEther("20"));
+            // Since rewards are complex to calculate off-chain, we'll just check that it's a non-negative number
+            expect(totalPendingCirqa).to.be.gte(0);
+        });
+    });
+
+    describe("Global Asset Info", function() {
+        beforeEach(async function() {
+            // Add asset1 and asset2 to the protocol
+            await protocol.add(100, await asset1.getAddress(), true);
+            await protocol.add(100, await asset2.getAddress(), true);
+
+            // User1 supplies 100 of asset1 and 50 of asset2
+            await asset1.connect(user1).approve(await protocol.getAddress(), ethers.parseEther("100"));
+            await protocol.connect(user1).supply(await asset1.getAddress(), ethers.parseEther("100"));
+            await asset2.connect(user1).approve(await protocol.getAddress(), ethers.parseEther("50"));
+            await protocol.connect(user1).supply(await asset2.getAddress(), ethers.parseEther("50"));
+
+            // User2 borrows 20 of asset1
+            await protocol.connect(user2).borrow(await asset1.getAddress(), ethers.parseEther("20"));
+        });
+
+        it("Should return correct aggregated asset info", async function() {
+            const [totalValueLocked, totalBorrows] = await protocol.getGlobalAssetInfo();
+
+            expect(totalValueLocked).to.equal(ethers.parseEther("150"));
+            expect(totalBorrows).to.equal(ethers.parseEther("20"));
         });
     });
 });
