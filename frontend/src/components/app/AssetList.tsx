@@ -20,7 +20,7 @@ const formatDisplayValue = (value: any, decimals = 18, prefix = '', suffix = '')
 
 const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => {
   const account = useActiveAccount();
-  const [assetData, setAssetData] = useState<{ name: string, symbol: string, decimals: number, walletBalance: bigint, supplied: bigint, borrowed: bigint } | null>(null);
+  const [assetData, setAssetData] = useState<{ name: string, symbol: string, decimals: number, walletBalance: bigint, supplied: bigint, borrowed: bigint, allocPoint?: bigint, totalAllocPoint?: bigint } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -32,9 +32,14 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
           method: 'function assetInfo(uint256) view returns (address asset, uint256 allocPoint, uint256 lastRewardTime, uint256 accCirqaPerShare, uint256 totalPoints)',
           params: [pid],
         });
-
         const assetAddress = assetInfo[0];
-        if (!assetAddress) return;
+        const allocPoint = assetInfo[1];
+        // Fetch totalAllocPoint from protocol contract
+        const totalAllocPoint = await readContract({
+          contract: cirqaProtocolContract,
+          method: 'function totalAllocPoint() view returns (uint256)',
+          params: [],
+        });
 
         const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
 
@@ -69,7 +74,7 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
           borrowed = userInfo[1];
         }
 
-        setAssetData({ name, symbol, decimals, walletBalance, supplied, borrowed });
+        setAssetData({ name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint });
       } catch (error) {
         console.error('Failed to fetch asset data:', error);
       } finally {
@@ -94,7 +99,13 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
 
   if (!assetData) return null; // Or some fallback UI
 
-  const { name, symbol, decimals, walletBalance, supplied, borrowed } = assetData;
+  const { name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint } = assetData;
+  let shareOfPool = null;
+  if (allocPoint && totalAllocPoint && totalAllocPoint > BigInt(0)) {
+    shareOfPool = type === 'supply'
+      ? Number(allocPoint) / Number(totalAllocPoint) * 100
+      : Number(allocPoint) / Number(totalAllocPoint) * 100 / 2;
+  }
 
   return (
     <tr className="border-b border-gray-800">
@@ -110,7 +121,7 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
         </div>
       </td>
       <td className="py-4">
-        <div className="font-medium">{'N/A'}</div>
+        <div className="font-medium">{shareOfPool !== null ? `${shareOfPool.toFixed(2)}%` : 'N/A'}</div>
       </td>
       <td className="py-4">
         <div className="font-medium">{formatDisplayValue(walletBalance, decimals)}</div>
@@ -165,7 +176,7 @@ const AssetList = ({ type }: AssetListProps) => {
         <thead>
           <tr className="text-left text-gray-400 border-b border-gray-800">
             <th className="pb-4">Asset</th>
-            <th className="pb-4">{type === 'supply' ? 'APY' : 'Borrow APY'}</th>
+            <th className="pb-4">{type === 'supply' ? 'Pool %' : 'Borrow APY'}</th>
             <th className="pb-4">Wallet Balance</th>
             {type === 'supply' ? (
               <>
