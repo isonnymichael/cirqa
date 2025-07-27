@@ -20,7 +20,7 @@ const formatDisplayValue = (value: any, decimals = 18, prefix = '', suffix = '')
 
 const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => {
   const account = useActiveAccount();
-  const [assetData, setAssetData] = useState<{ name: string, symbol: string, decimals: number, walletBalance: bigint, supplied: bigint, borrowed: bigint, allocPoint?: bigint, totalAllocPoint?: bigint } | null>(null);
+  const [assetData, setAssetData] = useState<{ name: string, symbol: string, decimals: number, walletBalance: bigint, supplied: bigint, borrowed: bigint, allocPoint?: bigint, totalAllocPoint?: bigint, available?: bigint } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -34,36 +34,31 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
         });
         const assetAddress = assetInfo[0];
         const allocPoint = assetInfo[1];
-        // Fetch totalAllocPoint from protocol contract
         const totalAllocPoint = await readContract({
           contract: cirqaProtocolContract,
           method: 'function totalAllocPoint() view returns (uint256)',
           params: [],
         });
-
         const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
-
         try {
           const tokenUri = await readContract({
             contract: assetContract,
             method: 'function tokenURI(uint256) view returns (string)',
-            params: [BigInt(1)], // Using a default token ID to fetch metadata
+            params: [BigInt(1)],
           });
           console.log(`[PID: ${pid}] Token URI:`, tokenUri);
         } catch (e) {
           console.log(`[PID: ${pid}] Could not fetch tokenURI. It might not be implemented on this contract.`);
         }
-
         const [name, symbol, decimals] = await Promise.all([
           readContract({ contract: assetContract, method: 'function name() view returns (string)', params: [] }),
           readContract({ contract: assetContract, method: 'function symbol() view returns (string)', params: [] }),
           readContract({ contract: assetContract, method: 'function decimals() view returns (uint8)', params: [] }),
         ]);
-
         let walletBalance = BigInt(0);
         let supplied = BigInt(0);
         let borrowed = BigInt(0);
-
+        let available = BigInt(0);
         if (account?.address) {
           const [balance, userInfo] = await Promise.all([
             readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [account.address] }),
@@ -73,17 +68,23 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
           supplied = userInfo[0];
           borrowed = userInfo[1];
         }
-
-        setAssetData({ name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint });
+        // Fetch available liquidity for borrow
+        if (type === 'borrow') {
+          try {
+            available = await readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [cirqaProtocolContract.address] });
+          } catch (e) {
+            available = BigInt(0);
+          }
+        }
+        setAssetData({ name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint, available });
       } catch (error) {
         console.error('Failed to fetch asset data:', error);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchAssetData();
-  }, [pid, account]);
+  }, [pid, account, type]);
 
   if (isLoading) {
     return (
@@ -149,7 +150,7 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
             <div className="text-sm text-gray-400">{symbol}</div>
           </td>
           <td className="py-4">
-            <div className="font-medium">{'N/A'}</div>
+            <div className="font-medium">{formatDisplayValue(assetData.available, decimals)}</div>
             <div className="text-sm text-gray-400">{symbol}</div>
           </td>
         </>
