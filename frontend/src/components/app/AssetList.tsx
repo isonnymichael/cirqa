@@ -1,11 +1,9 @@
 'use client';
 
-'use client';
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Spinner from '@/app/Spinner';
-import { useReadContract, useActiveAccount } from 'thirdweb/react';
-import { getContract } from 'thirdweb';
+import { useActiveAccount, useReadContract } from 'thirdweb/react';
+import { getContract, readContract } from 'thirdweb';
 import { formatUnits } from 'ethers';
 import { cirqaProtocolContract } from '@/lib/contracts';
 import { kiiTestnet } from '@/lib/chain';
@@ -22,74 +20,54 @@ const formatDisplayValue = (value: any, decimals = 18, prefix = '', suffix = '')
 
 const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => {
   const account = useActiveAccount();
+  const [assetData, setAssetData] = useState<{ name: string, symbol: string, decimals: number, walletBalance: bigint, supplied: bigint, borrowed: bigint } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data: assetInfo, isLoading: isAssetInfoLoading } = useReadContract({
-    contract: cirqaProtocolContract,
-    method: 'function assetInfo(uint256) view returns (address asset, uint256 allocPoint, uint256 lastRewardTime, uint256 accCirqaPerShare, uint256 totalPoints)',
-    params: [pid],
-  });
+  useEffect(() => {
+    const fetchAssetData = async () => {
+      setIsLoading(true);
+      try {
+        const assetInfo = await readContract({
+          contract: cirqaProtocolContract,
+          method: 'function assetInfo(uint256) view returns (address asset, uint256 allocPoint, uint256 lastRewardTime, uint256 accCirqaPerShare, uint256 totalPoints)',
+          params: [pid],
+        });
 
-  // Return early if assetInfo is not available yet
-  if (isAssetInfoLoading || !assetInfo) {
-    return (
-      <tr className="border-b border-gray-800">
-        <td colSpan={6} className="py-4 text-center">
-          <div className="flex justify-center">
-            <Spinner />
-          </div>
-        </td>
-      </tr>
-    );
-  }
+        const assetAddress = assetInfo[0];
+        if (!assetAddress) return;
 
-  const assetAddress = Array.isArray(assetInfo) && assetInfo[0] ? assetInfo[0] : '';
-  const assetContract = assetAddress && typeof assetAddress === 'string' ? getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress }) : null;
+        const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
 
-  // Return early if assetContract couldn't be created
-  if (!assetContract) {
-    return (
-      <tr className="border-b border-gray-800">
-        <td colSpan={6} className="py-4 text-center">
-          <div className="flex justify-center">
-            <Spinner />
-          </div>
-        </td>
-      </tr>
-    );
-  }
-  console.log(assetContract);
-  const { data: name, isLoading: isNameLoading } = useReadContract({
-    contract: assetContract,
-    method: 'function name() view returns (string)',
-    params: []
-  });
-  console.log(name);
+        const [name, symbol, decimals] = await Promise.all([
+          readContract({ contract: assetContract, method: 'function name() view returns (string)', params: [] }),
+          readContract({ contract: assetContract, method: 'function symbol() view returns (string)', params: [] }),
+          readContract({ contract: assetContract, method: 'function decimals() view returns (uint8)', params: [] }),
+        ]);
 
-  const { data: symbol, isLoading: isSymbolLoading } = useReadContract({
-    contract: assetContract,
-    method: 'function symbol() view returns (string)',
-    params: []
-  });
+        let walletBalance = BigInt(0);
+        let supplied = BigInt(0);
+        let borrowed = BigInt(0);
 
-  const { data: decimals, isLoading: isDecimalsLoading } = useReadContract({
-    contract: assetContract,
-    method: 'function decimals() view returns (uint8)',
-    params: [],
-  });
+        if (account?.address) {
+          const [balance, userInfo] = await Promise.all([
+            readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [account.address] }),
+            readContract({ contract: cirqaProtocolContract, method: 'function userInfo(uint256, address) view returns (uint256 supplied, uint256 borrowed)', params: [pid, account.address] })
+          ]);
+          walletBalance = balance;
+          supplied = userInfo[0];
+          borrowed = userInfo[1];
+        }
 
-  const { data: walletBalance, isLoading: isWalletBalanceLoading } = useReadContract({
-    contract: assetContract,
-    method: 'function balanceOf(address) view returns (uint256)',
-    params: [account?.address || ''],
-  });
+        setAssetData({ name, symbol, decimals, walletBalance, supplied, borrowed });
+      } catch (error) {
+        console.error('Failed to fetch asset data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const { data: userInfo, isLoading: isUserInfoLoading } = useReadContract({
-    contract: cirqaProtocolContract,
-    method: 'function userInfo(uint256, address) view returns (uint256 supplied, uint256 borrowed)',
-    params: [pid, account?.address || ''],
-  });
-
-  const isLoading = isNameLoading || isSymbolLoading || isDecimalsLoading || isWalletBalanceLoading || isUserInfoLoading;
+    fetchAssetData();
+  }, [pid, account]);
 
   if (isLoading) {
     return (
@@ -102,15 +80,16 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
       </tr>
     );
   }
-  
-  const supplied = userInfo?.[0] ?? BigInt(0);
-  const borrowed = userInfo?.[1] ?? BigInt(0);
+
+  if (!assetData) return null; // Or some fallback UI
+
+  const { name, symbol, decimals, walletBalance, supplied, borrowed } = assetData;
 
   return (
     <tr className="border-b border-gray-800">
       <td className="py-4">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 bg-gray-700 text-xs rounded-full flex items-center justify-center">
             {typeof symbol === 'string' ? symbol : '?'}
           </div>
           <div>
