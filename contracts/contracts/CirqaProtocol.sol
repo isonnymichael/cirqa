@@ -31,6 +31,7 @@ contract CirqaProtocol is Ownable {
         uint256 supplied;
         uint256 borrowed;
         uint256 rewardDebt; // Reward debt. See explanation below.
+        bool useAsCollateral; // Whether this asset is enabled as collateral by the user
     }
 
     struct AssetInfo {
@@ -49,6 +50,32 @@ contract CirqaProtocol is Ownable {
     event Repay(address indexed user, uint256 indexed pid, uint256 amount);
     event Claim(address indexed user, uint256 amount);
     event ProtocolFeePaid(address indexed asset, address indexed user, uint256 feeAmount);
+    event CollateralStatusChanged(address indexed user, uint256 indexed pid, bool enabled);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Collateral Logic
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @notice Enable or disable an asset as collateral for the user.
+     * @param _pid The pool id of the asset.
+     * @param _enabled True to enable as collateral, false to disable.
+     */
+    function setCollateralStatus(uint256 _pid, bool _enabled) external {
+        userInfo[_pid][msg.sender].useAsCollateral = _enabled;
+        emit CollateralStatusChanged(msg.sender, _pid, _enabled);
+    }
+
+    /**
+     * @notice Returns whether the asset is enabled as collateral for a user.
+     * @param _pid The pool id of the asset.
+     * @param _user The address of the user.
+     */
+    function isCollateral(uint256 _pid, address _user) external view returns (bool) {
+        return userInfo[_pid][_user].useAsCollateral;
+    }
 
     /*
     |--------------------------------------------------------------------------
