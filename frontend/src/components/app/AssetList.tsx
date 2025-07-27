@@ -9,14 +9,6 @@ import { getContract } from 'thirdweb';
 import { formatUnits } from 'ethers';
 import { cirqaProtocolContract } from '@/lib/contracts';
 import { kiiTestnet } from '@/lib/chain';
-import { Abi } from 'viem';
-
-const erc20Abi = [
-  { "constant": true, "inputs": [], "name": "name", "outputs": [{ "name": "", "type": "string" }], "payable": false, "stateMutability": "view", "type": "function" },
-  { "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "payable": false, "stateMutability": "view", "type": "function" },
-  { "constant": true, "inputs": [{ "name": "_owner", "type": "address" }], "name": "balanceOf", "outputs": [{ "name": "balance", "type": "uint256" }], "payable": false, "stateMutability": "view", "type": "function" },
-  { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "payable": false, "stateMutability": "view", "type": "function" }
-];
 
 type AssetListProps = {
   type: 'supply' | 'borrow';
@@ -33,35 +25,12 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
 
   const { data: assetInfo, isLoading: isAssetInfoLoading } = useReadContract({
     contract: cirqaProtocolContract,
-    method: 'assetInfo',
+    method: 'function assetInfo(uint256) view returns (address asset, uint256 allocPoint, uint256 lastRewardTime, uint256 accCirqaPerShare, uint256 totalPoints)',
     params: [pid],
   });
 
-  const assetAddress = Array.isArray(assetInfo) && assetInfo[0] ? assetInfo[0] : '';
-  const assetContract = assetAddress && typeof assetAddress === 'string' ? getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress, abi: erc20Abi as Abi }) : null;
-
-  // @ts-ignore
-  const { data: name, isLoading: isNameLoading } = useReadContract({ contract: assetContract, method: 'name', params: [], enabled: !!assetContract });
-  // @ts-ignore
-  const { data: symbol, isLoading: isSymbolLoading } = useReadContract({ contract: assetContract, method: 'symbol', params: [], enabled: !!assetContract });
-  // @ts-ignore
-  const { data: decimals, isLoading: isDecimalsLoading } = useReadContract({ contract: assetContract, method: 'decimals', params: [], enabled: !!assetContract });
-  // @ts-ignore
-  const { data: walletBalance, isLoading: isWalletBalanceLoading } = useReadContract({ contract: assetContract, method: 'balanceOf', params: account ? [account.address] : [], enabled: !!account && !!assetContract });
-
-  const { data: userInfo, isLoading: isUserInfoLoading } = useReadContract({
-    contract: cirqaProtocolContract,
-    method: 'userInfo',
-    params: account ? [pid, account.address] : [],
-    queryOptions: { enabled: !!account }, 
-  });
-
-  const supplied = userInfo?.[0] ?? BigInt(0);
-  const borrowed = userInfo?.[1] ?? BigInt(0);
-
-  const isLoading = isAssetInfoLoading || isNameLoading || isSymbolLoading || isDecimalsLoading || isWalletBalanceLoading || isUserInfoLoading;
-
-    if (isLoading) {
+  // Return early if assetInfo is not available yet
+  if (isAssetInfoLoading || !assetInfo) {
     return (
       <tr className="border-b border-gray-800">
         <td colSpan={6} className="py-4 text-center">
@@ -72,6 +41,70 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
       </tr>
     );
   }
+
+  const assetAddress = Array.isArray(assetInfo) && assetInfo[0] ? assetInfo[0] : '';
+  const assetContract = assetAddress && typeof assetAddress === 'string' ? getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress }) : null;
+
+  // Return early if assetContract couldn't be created
+  if (!assetContract) {
+    return (
+      <tr className="border-b border-gray-800">
+        <td colSpan={6} className="py-4 text-center">
+          <div className="flex justify-center">
+            <Spinner />
+          </div>
+        </td>
+      </tr>
+    );
+  }
+  console.log(assetContract);
+  const { data: name, isLoading: isNameLoading } = useReadContract({
+    contract: assetContract,
+    method: 'function name() view returns (string)',
+    params: []
+  });
+  console.log(name);
+
+  const { data: symbol, isLoading: isSymbolLoading } = useReadContract({
+    contract: assetContract,
+    method: 'function symbol() view returns (string)',
+    params: []
+  });
+
+  const { data: decimals, isLoading: isDecimalsLoading } = useReadContract({
+    contract: assetContract,
+    method: 'function decimals() view returns (uint8)',
+    params: [],
+  });
+
+  const { data: walletBalance, isLoading: isWalletBalanceLoading } = useReadContract({
+    contract: assetContract,
+    method: 'function balanceOf(address) view returns (uint256)',
+    params: [account?.address || ''],
+  });
+
+  const { data: userInfo, isLoading: isUserInfoLoading } = useReadContract({
+    contract: cirqaProtocolContract,
+    method: 'function userInfo(uint256, address) view returns (uint256 supplied, uint256 borrowed)',
+    params: [pid, account?.address || ''],
+  });
+
+  const isLoading = isNameLoading || isSymbolLoading || isDecimalsLoading || isWalletBalanceLoading || isUserInfoLoading;
+
+  if (isLoading) {
+    return (
+      <tr className="border-b border-gray-800">
+        <td colSpan={6} className="py-4 text-center">
+          <div className="flex justify-center">
+            <Spinner />
+          </div>
+        </td>
+      </tr>
+    );
+  }
+  
+  const supplied = userInfo?.[0] ?? BigInt(0);
+  const borrowed = userInfo?.[1] ?? BigInt(0);
 
   return (
     <tr className="border-b border-gray-800">
@@ -130,13 +163,11 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
 };
 
 const AssetList = ({ type }: AssetListProps) => {
-  const { data: assetsLength, isLoading } = useReadContract({
+  const { data: assetLength, isLoading } = useReadContract({
     contract: cirqaProtocolContract,
-    method: 'getAssetsLength',
+    method: 'function getAssetsLength() view returns (uint256)',
     params: [],
   });
-
-  console.log(assetsLength);
 
   return (
     <div className="overflow-x-auto">
@@ -169,10 +200,12 @@ const AssetList = ({ type }: AssetListProps) => {
                 </div>
               </td>
             </tr>
-          ) : Number(assetsLength || 0) === 0 ? (
+          ) : !assetLength ? (
+            <tr><td colSpan={6} className="text-center py-4">Loading assets...</td></tr>
+          ) : Number(assetLength) === 0 ? (
             <tr><td colSpan={6} className="text-center py-4">No assets available.</td></tr>
           ) : (
-            [...Array(Number(assetsLength || 0))].map((_, i) => (
+            [...Array(Number(assetLength))].map((_, i) => (
               <AssetRow key={i} pid={BigInt(i)} type={type} />
             ))
           )}

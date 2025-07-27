@@ -13,7 +13,7 @@ const UserStats: React.FC = () => {
 
   const { data: globalUserInfo, isLoading: isGlobalUserInfoLoading } = useReadContract({
     contract: cirqaProtocolContract,
-    method: 'getGlobalUserInfo',
+    method: 'function getGlobalUserInfo(address user) view returns (uint256, uint256, uint256)',
     params: [account?.address || ''],
     queryOptions: { enabled: !!account },
   });
@@ -24,9 +24,10 @@ const UserStats: React.FC = () => {
     return `${prefix}${formatted}${suffix}`;
   };
 
-  const totalSupplied = globalUserInfo ? globalUserInfo[0] : BigInt(0);
-  const totalBorrowed = globalUserInfo ? globalUserInfo[1] : BigInt(0);
-  const totalPendingCirqa = globalUserInfo ? globalUserInfo[2] : BigInt(0);
+  // Use optional chaining and nullish coalescing to safely handle undefined data
+  const totalSupplied = globalUserInfo?.[0] ?? undefined;
+  const totalBorrowed = globalUserInfo?.[1] ?? undefined;
+  const totalPendingCirqa = globalUserInfo?.[2] ?? undefined;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -11,13 +11,13 @@ import { cirqaProtocolContract } from '@/lib/contracts';
 const MarketOverview = () => {
   const { data: globalAssetInfo, isLoading: isGlobalAssetInfoLoading } = useReadContract({
     contract: cirqaProtocolContract,
-    method: 'getGlobalAssetInfo',
+    method: 'function getGlobalAssetInfo() view returns (uint256, uint256)',
     params: [],
   });
 
   const { data: cirqaPerSecond, isLoading: isCirqaPerSecondLoading } = useReadContract({
     contract: cirqaProtocolContract,
-    method: 'cirqaPerSecond',
+    method: 'function cirqaPerSecond() view returns (uint256)',
     params: [],
   });
 
@@ -27,9 +27,11 @@ const MarketOverview = () => {
     return `${prefix}${formatted}${suffix}`;
   };
 
-  const dailyRewards = typeof cirqaPerSecond === 'bigint' ? cirqaPerSecond * BigInt(86400) : BigInt(0);
+  // Ensure we have valid data before calculations
+  const dailyRewards = typeof cirqaPerSecond === 'bigint' ? cirqaPerSecond * BigInt(86400) : undefined;
 
-  const [totalValueLocked, totalBorrowed] = globalAssetInfo || [BigInt(0), BigInt(0)];
+  // Use optional chaining and nullish coalescing to safely handle undefined data
+  const [totalValueLocked, totalBorrowed] = globalAssetInfo ?? [undefined, undefined];
   const totalSupplied = totalValueLocked; // TVL is equivalent to total supplied in this model
 
   return (
