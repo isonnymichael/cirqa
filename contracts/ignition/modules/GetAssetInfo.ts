@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  const protocolAddress = "0x417755fE659D63719139c8b8525cCC88a1eb0F0C";
+  const protocolAddress = "0x6f6A53069f1894D44032424AdB2c173C4d745526";
 
   console.log(`Fetching asset info from protocol: ${protocolAddress}`);
 
