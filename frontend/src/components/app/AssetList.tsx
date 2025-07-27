@@ -38,6 +38,17 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
 
         const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
 
+        try {
+          const tokenUri = await readContract({
+            contract: assetContract,
+            method: 'function tokenURI(uint256) view returns (string)',
+            params: [BigInt(1)], // Using a default token ID to fetch metadata
+          });
+          console.log(`[PID: ${pid}] Token URI:`, tokenUri);
+        } catch (e) {
+          console.log(`[PID: ${pid}] Could not fetch tokenURI. It might not be implemented on this contract.`);
+        }
+
         const [name, symbol, decimals] = await Promise.all([
           readContract({ contract: assetContract, method: 'function name() view returns (string)', params: [] }),
           readContract({ contract: assetContract, method: 'function symbol() view returns (string)', params: [] }),
@@ -90,7 +101,7 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
       <td className="py-4">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-gray-700 text-xs rounded-full flex items-center justify-center">
-            {typeof symbol === 'string' ? symbol : '?'}
+            {typeof symbol === 'string' ? symbol.charAt(0) : '?'}
           </div>
           <div>
             <div className="font-medium">{name}</div>
