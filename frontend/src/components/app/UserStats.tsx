@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Spinner from '@/app/Spinner';
 import { useActiveAccount, useReadContract } from 'thirdweb/react';
 import { formatUnits } from 'ethers';
 import { cirqaProtocolContract } from '@/lib/contracts';
+import { FaInfoCircle } from 'react-icons/fa';
 
 const UserStats: React.FC = () => {
   const account = useActiveAccount();
@@ -43,8 +44,16 @@ const UserStats: React.FC = () => {
       </div>
       
       <div className="card p-4">
-        <div className="text-sm text-gray-400 mb-1">CRQ Rewards</div>
-                <div className="text-xl font-bold">{isGlobalUserInfoLoading ? <Spinner /> : formatDisplayValue(totalPendingCirqa, 18, '', ' CRQ')}</div>
+        <div className="text-sm text-gray-400 mb-1 flex items-center">
+          <span>CRQ Rewards</span>
+          <div className="relative group ml-2">
+            <FaInfoCircle className="text-gray-400 hover:text-accent cursor-pointer" size={14} />
+            <div className="absolute left-0 bottom-full mb-2 w-64 bg-gray-800 p-3 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-xs">
+              CRQ Rewards are automatically earned through supply or borrow activities. Rewards accumulate every second and do not need to be claimed manually.
+            </div>
+          </div>
+        </div>
+        <div className="text-xl font-bold">{isGlobalUserInfoLoading ? <Spinner /> : formatDisplayValue(totalPendingCirqa, 18, '', ' CRQ')}</div>
       </div>
     </div>
   );

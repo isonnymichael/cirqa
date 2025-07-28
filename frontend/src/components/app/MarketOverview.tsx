@@ -3,6 +3,7 @@
 'use client';
 
 import React from 'react';
+import { FaInfoCircle } from 'react-icons/fa';
 import Spinner from '@/app/Spinner';
 import { useReadContract } from 'thirdweb/react';
 import { formatUnits } from 'ethers';
@@ -56,7 +57,15 @@ const MarketOverview = () => {
         </div>
         
         <div>
-          <div className="text-sm text-gray-400 mb-1">Daily Rewards</div>
+          <div className="text-sm text-gray-400 mb-1 flex items-center">
+            <span>Daily Rewards</span>
+            <div className="relative group ml-2">
+              <FaInfoCircle className="text-gray-400 hover:text-accent cursor-pointer" size={14} />
+              <div className="absolute left-0 bottom-full mb-2 w-64 bg-gray-800 p-3 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-xs">
+                Daily Rewards represent the total amount of CRQ tokens distributed to users each day. These rewards are automatically earned by users who supply or borrow assets on the platform.
+              </div>
+            </div>
+          </div>
                     <div className="text-2xl font-bold">{isCirqaPerSecondLoading ? <Spinner /> : formatDisplayValue(dailyRewards, 18, '', ' CRQ')}</div>
           <div className="text-xs text-gray-400 mt-1">Estimated daily CRQ rewards</div>
         </div>

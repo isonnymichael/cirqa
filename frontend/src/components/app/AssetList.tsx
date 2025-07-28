@@ -12,6 +12,7 @@ import SupplyModal from './SupplyModal';
 import BorrowModal from './BorrowModal';
 import WithdrawModal from './WithdrawModal';
 import RepayModal from './RepayModal';
+import { FaInfoCircle } from 'react-icons/fa';
 
 type Asset = {
   pid: bigint;
@@ -454,7 +455,33 @@ const AssetList = ({ type }: AssetListProps) => {
         <thead>
           <tr className="text-left text-gray-400 border-b border-gray-800">
             <th className="pb-4">Asset</th>
-            <th className="pb-4">{type === 'supply' ? 'Pool %' : 'Borrow APY'}</th>
+            <th className="pb-4">
+              <div className="flex items-center">
+                <div className="mr-1">{type === 'supply' ? 'Pool %' : 'Pool %'}</div>
+                <div className="relative">
+                  <FaInfoCircle 
+                    className="text-gray-400 hover:text-white cursor-pointer" 
+                    size={14} 
+                    onMouseEnter={(e) => {
+                      const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (tooltip) tooltip.style.display = 'block';
+                    }}
+                    onMouseLeave={(e) => {
+                      const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (tooltip) tooltip.style.display = 'none';
+                    }}
+                  />
+                  <div 
+                    className="absolute left-0 top-full mt-2 w-64 bg-gray-800 text-white text-xs rounded p-2 shadow-lg z-10"
+                    style={{ display: 'none' }}
+                  >
+                    {type === 'supply' 
+                      ? 'Pool% represents the percentage of CRQ rewards allocated to this asset. Supply pools receive the full allocation percentage of rewards.'
+                      : 'Pool% represents the percentage of CRQ rewards allocated to this asset. Borrow pools receive half the allocation percentage of rewards compared to supply pools.'}
+                  </div>
+                </div>
+              </div>
+            </th>
             <th className="pb-4">Wallet Balance</th>
             {type === 'supply' ? (
               <>
