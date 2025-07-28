@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useSendTransaction } from 'thirdweb/react';
+import { useSendTransaction, useReadContract } from 'thirdweb/react';
 import { prepareContractCall } from 'thirdweb';
 import { cirqaProtocolContract } from '@/lib/contracts';
 import { parseUnits, formatUnits } from 'ethers';
@@ -17,6 +17,16 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ isOpen, onClose, asset, onSuc
   const [amount, setAmount] = useState('');
   const [isBorrowing, setIsBorrowing] = useState(false);
   const { mutate: sendTransaction } = useSendTransaction();
+
+  // Fetch protocol fee from blockchain
+  const { data: protocolFeeBps, isLoading: isProtocolFeeLoading } = useReadContract({
+    contract: cirqaProtocolContract,
+    method: 'function protocolFeeBps() view returns (uint256)',
+    params: [],
+  });
+
+  // Calculate fee percentage
+  const feePercentage = protocolFeeBps ? Number(protocolFeeBps) / 100 : 0;
 
   const handleBorrow = async () => {
     if (!asset || !amount) return;
@@ -74,6 +84,17 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ isOpen, onClose, asset, onSuc
             placeholder={`Available: ${formatUnits(asset.available, asset.decimals)}`}
           />
         </div>
+        
+        {/* Protocol Fee Information */}
+        <div className="mb-4 text-sm text-gray-400">
+          <p>Protocol Fee: {isProtocolFeeLoading ? 'Loading...' : `${feePercentage}%`}</p>
+          {amount && !isProtocolFeeLoading && (
+            <p className="mt-1">
+              Fee Amount: {(parseFloat(amount) * feePercentage / 100).toFixed(asset.decimals > 8 ? 8 : asset.decimals)} {asset.symbol}
+            </p>
+          )}
+        </div>
+        
         <div className="flex justify-end space-x-4">
           <button onClick={onClose} className="cursor-pointer btn-secondary">Cancel</button>
           <button onClick={handleBorrow} className="cursor-pointer btn-primary" disabled={isBorrowing}>
