@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useSendTransaction } from 'thirdweb/react';
-import { prepareContractCall } from 'thirdweb';
+import { useSendTransaction, useActiveAccount } from 'thirdweb/react';
+import { readContract } from 'thirdweb';
+import { prepareContractCall, getContract } from 'thirdweb';
 import { cirqaProtocolContract } from '@/lib/contracts';
-import { parseUnits, formatUnits } from 'ethers';
+import { parseUnits, formatUnits, MaxUint256 } from 'ethers';
+import { kiiTestnet } from '@/lib/chain';
 
 interface SupplyModalProps {
   isOpen: boolean;
@@ -15,30 +17,70 @@ interface SupplyModalProps {
 
 const SupplyModal: React.FC<SupplyModalProps> = ({ isOpen, onClose, asset, onSuccess }) => {
   const [amount, setAmount] = useState('');
-  const { mutate: sendTransaction, isPending } = useSendTransaction();
+  const [isApproving, setIsApproving] = useState(false);
+  const [isSupplying, setIsSupplying] = useState(false);
+  const { mutate: sendTransaction } = useSendTransaction();
+  const account = useActiveAccount();
 
   const handleSupply = async () => {
-    if (!asset || !amount) return;
+    if (!asset || !amount || !account) return;
+
+    const amountBN = parseUnits(amount, asset.decimals);
+    const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: asset.assetAddress });
 
     try {
-      const amountBN = parseUnits(amount, asset.decimals);
-      const transaction = prepareContractCall({
+      const allowance = await readContract({
+        contract: assetContract,
+        method: "function allowance(address owner, address spender) view returns (uint256)",
+        params: [account.address, cirqaProtocolContract.address]
+      });
+
+      if (allowance < amountBN) {
+        setIsApproving(true);
+        const approveTx = prepareContractCall({
+          contract: assetContract,
+          method: "function approve(address spender, uint256 amount)",
+          params: [cirqaProtocolContract.address, MaxUint256], // Unlimited approval
+        });
+        
+        await new Promise((resolve, reject) => {
+          sendTransaction(approveTx, { 
+            onSuccess: resolve,
+            onError: reject
+          });
+        });
+
+        setIsApproving(false);
+      }
+
+      // Proceed with supply
+      setIsSupplying(true);
+      const supplyTransaction = prepareContractCall({
         contract: cirqaProtocolContract,
         method: 'function supply(address,uint256)',
         params: [asset.assetAddress, amountBN],
       });
 
-      sendTransaction(transaction, {
-        onSuccess: () => {
-          onSuccess();
-          onClose();
-        },
-        onError: (error) => {
-          console.error('Supply failed', error);
-        },
+      await new Promise((resolve, reject) => {
+        sendTransaction(supplyTransaction, {
+          onSuccess: (receipt) => {
+            console.log(receipt);
+            onSuccess();
+            onClose();
+            resolve(receipt);
+          },
+          onError: (error) => {
+            console.error('Supply failed', error);
+            reject(error);
+          },
+        });
       });
+
     } catch (error) {
       console.error('Failed to prepare supply transaction', error);
+    } finally {
+      setIsApproving(false);
+      setIsSupplying(false);
     }
   };
 
@@ -61,8 +103,12 @@ const SupplyModal: React.FC<SupplyModalProps> = ({ isOpen, onClose, asset, onSuc
         </div>
         <div className="flex justify-end space-x-4">
           <button onClick={onClose} className="cursor-pointer btn-secondary">Cancel</button>
-          <button onClick={handleSupply} className="cursor-pointer btn-primary" disabled={isPending}>
-            {isPending ? 'Supplying...' : 'Supply'}
+          <button 
+            onClick={handleSupply} 
+            className="cursor-pointer btn-primary" 
+            disabled={isApproving || isSupplying}
+          >
+            {isApproving ? 'Approving...' : isSupplying ? 'Supplying...' : 'Supply'}
           </button>
         </div>
       </div>

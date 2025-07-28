@@ -15,30 +15,41 @@ interface BorrowModalProps {
 
 const BorrowModal: React.FC<BorrowModalProps> = ({ isOpen, onClose, asset, onSuccess }) => {
   const [amount, setAmount] = useState('');
-  const { mutate: sendTransaction, isPending } = useSendTransaction();
+  const [isBorrowing, setIsBorrowing] = useState(false);
+  const { mutate: sendTransaction } = useSendTransaction();
 
   const handleBorrow = async () => {
     if (!asset || !amount) return;
 
+    const amountBN = parseUnits(amount, asset.decimals);
+
     try {
-      const amountBN = parseUnits(amount, asset.decimals);
+      setIsBorrowing(true);
       const transaction = prepareContractCall({
         contract: cirqaProtocolContract,
         method: 'function borrow(address,uint256)',
         params: [asset.assetAddress, amountBN],
       });
 
-      sendTransaction(transaction, {
-        onSuccess: () => {
-          onSuccess();
-          onClose();
-        },
-        onError: (error) => {
-          console.error('Borrow failed', error);
-        },
+      await new Promise((resolve, reject) => {
+        sendTransaction(transaction, {
+          onSuccess: (receipt) => {
+            console.log(receipt);
+            onSuccess();
+            onClose();
+            resolve(receipt);
+          },
+          onError: (error) => {
+            console.error('Borrow failed', error);
+            reject(error);
+          },
+        });
       });
+
     } catch (error) {
       console.error('Failed to prepare borrow transaction', error);
+    } finally {
+      setIsBorrowing(false);
     }
   };
 
@@ -61,8 +72,8 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ isOpen, onClose, asset, onSuc
         </div>
         <div className="flex justify-end space-x-4">
           <button onClick={onClose} className="cursor-pointer btn-secondary">Cancel</button>
-          <button onClick={handleBorrow} className="cursor-pointer btn-primary" disabled={isPending}>
-            {isPending ? 'Borrowing...' : 'Borrow'}
+          <button onClick={handleBorrow} className="cursor-pointer btn-primary" disabled={isBorrowing}>
+            {isBorrowing ? 'Borrowing...' : 'Borrow'}
           </button>
         </div>
       </div>

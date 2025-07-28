@@ -225,7 +225,8 @@ const AssetList = ({ type }: AssetListProps) => {
         params: [pid, enabled]
       });
       sendTransaction(transaction, {
-        onSuccess: () => {
+        onSuccess: (receipt) => {
+          console.log(receipt);
           fetchAllAssets();
           resolve();
         },
