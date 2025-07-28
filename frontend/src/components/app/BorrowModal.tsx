@@ -35,9 +35,13 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ isOpen, onClose, asset, onSuc
         sendTransaction(transaction, {
           onSuccess: (receipt) => {
             console.log(receipt);
-            onSuccess();
-            onClose();
-            resolve(receipt);
+            // Add a longer delay before calling onSuccess to allow blockchain to update
+            setTimeout(() => {
+              console.log('Borrow transaction confirmed, updating asset data...');
+              onSuccess();
+              onClose();
+              resolve(receipt);
+            }, 5000);
           },
           onError: (error) => {
             console.error('Borrow failed', error);

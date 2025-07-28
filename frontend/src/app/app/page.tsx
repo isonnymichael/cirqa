@@ -61,6 +61,7 @@ export default function AppPage() {
             >
               Borrow
             </button>
+            {/* Removed refresh button and added auto-refresh when switching tabs */}
           </div>
           
           {/* Asset List based on active tab */}

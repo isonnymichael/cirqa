@@ -26,6 +26,7 @@ const SupplyModal: React.FC<SupplyModalProps> = ({ isOpen, onClose, asset, onSuc
     if (!asset || !amount || !account) return;
 
     const amountBN = parseUnits(amount, asset.decimals);
+    console.log(asset.decimals);
     const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: asset.assetAddress });
 
     try {
@@ -65,9 +66,13 @@ const SupplyModal: React.FC<SupplyModalProps> = ({ isOpen, onClose, asset, onSuc
         sendTransaction(supplyTransaction, {
           onSuccess: (receipt) => {
             console.log(receipt);
-            onSuccess();
-            onClose();
-            resolve(receipt);
+            // Add a longer delay before calling onSuccess to allow blockchain to update
+            setTimeout(() => {
+              console.log('Supply transaction confirmed, updating asset data...');
+              onSuccess();
+              onClose();
+              resolve(receipt);
+            }, 5000);
           },
           onError: (error) => {
             console.error('Supply failed', error);

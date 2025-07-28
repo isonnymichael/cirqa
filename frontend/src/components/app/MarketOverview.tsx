@@ -39,19 +39,19 @@ const MarketOverview = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div>
           <div className="text-sm text-gray-400 mb-1">Total Value Locked</div>
-                    <div className="text-2xl font-bold">{isGlobalAssetInfoLoading ? <Spinner /> : formatDisplayValue(totalValueLocked, 18, '$')}</div>
+                    <div className="text-2xl font-bold">{isGlobalAssetInfoLoading ? <Spinner /> : formatDisplayValue(totalValueLocked, 8, '$')}</div>
           <div className="text-xs text-gray-400 mt-1">Across all assets</div>
         </div>
         
         <div>
           <div className="text-sm text-gray-400 mb-1">Total Borrowed</div>
-                    <div className="text-2xl font-bold">{isGlobalAssetInfoLoading ? <Spinner /> : formatDisplayValue(totalBorrowed, 18, '$')}</div>
+                    <div className="text-2xl font-bold">{isGlobalAssetInfoLoading ? <Spinner /> : formatDisplayValue(totalBorrowed, 8, '$')}</div>
            <div className="text-xs text-gray-400 mt-1">Across all assets</div>
         </div>
         
         <div>
           <div className="text-sm text-gray-400 mb-1">Total Supplied</div>
-                    <div className="text-2xl font-bold">{isGlobalAssetInfoLoading ? <Spinner /> : formatDisplayValue(totalSupplied, 18, '$')}</div>
+                    <div className="text-2xl font-bold">{isGlobalAssetInfoLoading ? <Spinner /> : formatDisplayValue(totalSupplied, 8, '$')}</div>
            <div className="text-xs text-gray-400 mt-1">Across all assets</div>
         </div>
         

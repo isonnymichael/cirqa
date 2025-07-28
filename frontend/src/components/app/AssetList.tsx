@@ -36,7 +36,13 @@ const formatDisplayValue = (value: any, decimals = 18, prefix = '', suffix = '')
   return `${prefix}${formatted}${suffix}`;
 };
 
-const AssetRow = ({ asset, type, onSupplyClick, onBorrowClick, onCollateralToggle }: { asset: Asset, type: 'supply' | 'borrow', onSupplyClick: () => void, onBorrowClick: () => void, onCollateralToggle: (pid: bigint, enabled: boolean) => Promise<void> }) => {
+const AssetRow = ({ asset, type, onSupply, onBorrow, onCollateralToggle }: { 
+  asset: Asset, 
+  type: 'supply' | 'borrow', 
+  onSupply: () => void, 
+  onBorrow: () => void, 
+  onCollateralToggle: (pid: bigint, enabled: boolean) => Promise<void> 
+}) => {
   const { name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint, collateralEnabled } = asset;
   const [collateralLoading, setCollateralLoading] = useState(false);
 
@@ -48,13 +54,15 @@ const AssetRow = ({ asset, type, onSupplyClick, onBorrowClick, onCollateralToggl
   }
 
   const handleToggleCollateral = async () => {
+    try {
       setCollateralLoading(true);
-      try {
-        await onCollateralToggle(asset.pid, !collateralEnabled);
-      } finally {
-        setCollateralLoading(false);
-      }
-    };
+      await onCollateralToggle(asset.pid, !collateralEnabled);
+    } catch (error) {
+      console.error('Failed to toggle collateral', error);
+    } finally {
+      setCollateralLoading(false);
+    }
+  };
 
   return (
     <tr className="border-b border-gray-800">
@@ -121,7 +129,7 @@ const AssetRow = ({ asset, type, onSupplyClick, onBorrowClick, onCollateralToggl
       <td className="py-4 text-right">
         <button
           className="cursor-pointer btn-primary hover:bg-accent hover:text-white transition-all"
-          onClick={type === 'supply' ? onSupplyClick : onBorrowClick}
+          onClick={type === 'supply' ? onSupply : onBorrow}
         >
           {type === 'supply' ? 'Supply' : 'Borrow'}
         </button>
@@ -145,74 +153,200 @@ const AssetList = ({ type }: AssetListProps) => {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const { mutate: sendTransaction } = useSendTransaction();
 
+  // Function to update a specific asset without reloading all assets
+  const updateSingleAsset = async (assetToUpdate: Asset) => {
+    if (!account?.address) return;
+    
+    try {
+      console.log(`Updating single asset: ${assetToUpdate.symbol}`);
+      
+      // Use non-blocking delay to ensure blockchain data is updated while keeping UI responsive
+      setTimeout(async () => {
+        try {
+          const pid = assetToUpdate.pid;
+          const assetContract = getContract({ 
+            client: cirqaProtocolContract.client, 
+            chain: kiiTestnet, 
+            address: assetToUpdate.assetAddress 
+          });
+          
+          // Get updated user data
+          const [balance, userInfo, isCollateral] = await Promise.all([
+            readContract({ 
+              contract: assetContract, 
+              method: 'function balanceOf(address) view returns (uint256)', 
+              params: [account.address] 
+            }),
+            readContract({ 
+              contract: cirqaProtocolContract, 
+              method: 'function userInfo(uint256, address) view returns (uint256 supplied, uint256 borrowed)', 
+              params: [pid, account.address] 
+            }),
+            readContract({ 
+              contract: cirqaProtocolContract, 
+              method: 'function isCollateral(uint256,address) view returns (bool)', 
+              params: [pid, account.address] 
+            })
+          ]);
+          
+          // Update asset data
+          const updatedAsset = { ...assetToUpdate };
+          updatedAsset.walletBalance = balance;
+          updatedAsset.supplied = userInfo[0];
+          updatedAsset.borrowed = userInfo[1];
+          updatedAsset.collateralEnabled = isCollateral;
+          
+          // Always update available amount for borrowable assets
+          try {
+            // Get the contract balance (total available in the protocol)
+            const contractBalance = await readContract({ 
+              contract: assetContract, 
+              method: 'function balanceOf(address) view returns (uint256)', 
+              params: [cirqaProtocolContract.address] 
+            });
+            
+            // Get total borrowed for this asset from the protocol
+            const assetTotalInfo = await readContract({
+              contract: cirqaProtocolContract,
+              method: 'function assetInfo(uint256) view returns (address,uint256,uint256,uint256,uint256,uint256,uint256)',
+              params: [pid]
+            });
+            
+            // The 6th item (index 5) in the returned array is totalBorrowed
+            const totalBorrowed = assetTotalInfo[6] || BigInt(0);
+            
+            // Calculate available = contract balance + total borrowed - user borrowed
+            updatedAsset.available = contractBalance + totalBorrowed - updatedAsset.borrowed;
+          } catch (e) {
+            console.error(`Failed to update available balance for asset ${assetToUpdate.symbol}:`, e);
+          }
+          
+          // Update the assets array with the new data
+          setAssets(prevAssets => {
+            return prevAssets.map(asset => 
+              asset.pid === pid ? updatedAsset : asset
+            );
+          });
+          
+          console.log(`Asset ${assetToUpdate.symbol} updated successfully:`, updatedAsset);
+        } catch (error) {
+          console.error(`Failed to update asset ${assetToUpdate.symbol} after delay:`, error);
+        }
+      }, 2000);
+      
+    } catch (error) {
+      console.error(`Failed to update asset ${assetToUpdate.symbol}:`, error);
+    }
+  };
+
   const fetchAllAssets = async () => {
     if (!assetLength) return;
     setIsLoading(true);
+    setIsRefreshing(true); // Set refreshing state to show loading indicator if needed
     try {
+      console.log('Fetching assets data...');
       const assetsData = await Promise.all(
         [...Array(Number(assetLength))].map(async (_, i) => {
           const pid = BigInt(i);
-          const assetInfo = await readContract({
-            contract: cirqaProtocolContract,
-            method: 'function assetInfo(uint256) view returns (address asset, uint256 allocPoint, uint256 lastRewardTime, uint256 accCirqaPerShare, uint256 totalPoints)',
-            params: [pid],
-          });
-          const assetAddress = assetInfo[0];
-          const allocPoint = assetInfo[1];
-          const totalAllocPoint = await readContract({
-            contract: cirqaProtocolContract,
-            method: 'function totalAllocPoint() view returns (uint256)',
-            params: [],
-          });
-          const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
-          const [name, symbol, decimals] = await Promise.all([
-            readContract({ contract: assetContract, method: 'function name() view returns (string)', params: [] }),
-            readContract({ contract: assetContract, method: 'function symbol() view returns (string)', params: [] }),
-            readContract({ contract: assetContract, method: 'function decimals() view returns (uint8)', params: [] }),
-          ]);
-
-          let walletBalance = BigInt(0);
-          let supplied = BigInt(0);
-          let borrowed = BigInt(0);
-          let available = BigInt(0);
-          let collateralEnabled = false;
-
-          if (account?.address) {
-            const [balance, userInfo, isCollateral] = await Promise.all([
-              readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [account.address] }),
-              readContract({ contract: cirqaProtocolContract, method: 'function userInfo(uint256, address) view returns (uint256 supplied, uint256 borrowed)', params: [pid, account.address] }),
-              readContract({ contract: cirqaProtocolContract, method: 'function isCollateral(uint256,address) view returns (bool)', params: [pid, account.address] })
+          try {
+            const assetInfo = await readContract({
+              contract: cirqaProtocolContract,
+              method: 'function assetInfo(uint256) view returns (address asset, uint256 allocPoint, uint256 lastRewardTime, uint256 accCirqaPerShare, uint256 totalPoints)',
+              params: [pid],
+            });
+            const assetAddress = assetInfo[0];
+            const allocPoint = assetInfo[1];
+            const totalAllocPoint = await readContract({
+              contract: cirqaProtocolContract,
+              method: 'function totalAllocPoint() view returns (uint256)',
+              params: [],
+            });
+            const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
+            const [name, symbol, decimals] = await Promise.all([
+              readContract({ contract: assetContract, method: 'function name() view returns (string)', params: [] }),
+              readContract({ contract: assetContract, method: 'function symbol() view returns (string)', params: [] }),
+              readContract({ contract: assetContract, method: 'function decimals() view returns (uint8)', params: [] }),
             ]);
-            walletBalance = balance;
-            supplied = userInfo[0];
-            borrowed = userInfo[1];
-            collateralEnabled = isCollateral;
 
-            if (type === 'borrow') {
+            let walletBalance = BigInt(0);
+            let supplied = BigInt(0);
+            let borrowed = BigInt(0);
+            let available = BigInt(0);
+            let collateralEnabled = false;
+
+            if (account?.address) {
               try {
-                available = await readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [cirqaProtocolContract.address] });
+                const [balance, userInfo, isCollateral] = await Promise.all([
+                  readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [account.address] }),
+                  readContract({ contract: cirqaProtocolContract, method: 'function userInfo(uint256, address) view returns (uint256 supplied, uint256 borrowed)', params: [pid, account.address] }),
+                  readContract({ contract: cirqaProtocolContract, method: 'function isCollateral(uint256,address) view returns (bool)', params: [pid, account.address] })
+                ]);
+                walletBalance = balance;
+                supplied = userInfo[0];
+                borrowed = userInfo[1];
+                collateralEnabled = isCollateral;
+
+                // Always calculate available amount for all assets
+                try {
+                  // Get the contract balance (total available in the protocol)
+                  const contractBalance = await readContract({ 
+                    contract: assetContract, 
+                    method: 'function balanceOf(address) view returns (uint256)', 
+                    params: [cirqaProtocolContract.address] 
+                  });
+                  
+                  // Get total borrowed for this asset from the protocol
+                  const assetTotalInfo = await readContract({
+                    contract: cirqaProtocolContract,
+                    method: 'function assetInfo(uint256) view returns (address,uint256,uint256,uint256,uint256,uint256,uint256)',
+                    params: [pid]
+                  });
+                  
+                  // The 6th item (index 5) in the returned array is totalBorrowed
+                  const totalBorrowed = assetTotalInfo[6] || BigInt(0);
+                  
+                  // Calculate available = contract balance + total borrowed - user borrowed
+                  available = contractBalance + totalBorrowed - borrowed;
+                } catch (e) {
+                  console.error(`Failed to get available balance for asset ${symbol}:`, e);
+                  available = BigInt(0);
+                }
               } catch (e) {
-                available = BigInt(0);
+                console.error(`Failed to get user data for asset ${assetAddress}:`, e);
               }
             }
-          }
 
-          return { pid, assetAddress, name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint, available, collateralEnabled };
+            return { pid, assetAddress, name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint, available, collateralEnabled };
+          } catch (e) {
+            console.error(`Failed to process asset ${i}:`, e);
+            return null;
+          }
         })
       );
-      setAssets(assetsData);
+      // Filter out any null values from failed asset fetches
+      const validAssetsData = assetsData.filter(asset => asset !== null) as Asset[];
+      console.log('Assets data fetched successfully:', validAssetsData);
+      setAssets(validAssetsData);
     } catch (error) {
       console.error('Failed to fetch assets:', error);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false); // Reset refreshing state
     }
   };
 
+  // Track when type changes to refresh data
   useEffect(() => {
-    if (assetLength) {
-      fetchAllAssets();
-    }
-  }, [assetLength, account]);
+    if (!assetLength) return;
+    
+    // Fetch assets data when dependencies change or when tab (type) changes
+    fetchAllAssets();
+    
+    // No polling interval - better practice
+  }, [assetLength, account, type]);
+  
+  // Keep isRefreshing state for loading indicator if needed elsewhere
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleCollateralToggle = (pid: bigint, enabled: boolean) => {
     return new Promise<void>((resolve, reject) => {
@@ -227,8 +361,27 @@ const AssetList = ({ type }: AssetListProps) => {
       sendTransaction(transaction, {
         onSuccess: (receipt) => {
           console.log(receipt);
-          fetchAllAssets();
-          resolve();
+          // Find the asset that was toggled
+          const assetToUpdate = assets.find(asset => asset.pid === pid);
+          if (assetToUpdate) {
+            // Update the asset locally without reading from contract
+            const updatedAsset = { ...assetToUpdate };
+            updatedAsset.collateralEnabled = enabled;
+            
+            // Update the assets array with the new data
+            setAssets(prevAssets => {
+              return prevAssets.map(asset => 
+                asset.pid === pid ? updatedAsset : asset
+              );
+            });
+            
+            console.log(`Asset ${assetToUpdate.symbol} collateral status updated locally to ${enabled}`);
+            
+            // Resolve immediately since we're not waiting for contract reads
+            resolve();
+          } else {
+            resolve();
+          }
         },
         onError: (error) => {
           console.error('Collateral toggle failed', error);
@@ -238,15 +391,17 @@ const AssetList = ({ type }: AssetListProps) => {
     });
   };
 
-  const openSupplyModal = (asset: Asset) => {
-    setSelectedAsset(asset);
-    setIsSupplyModalOpen(true);
-  };
-
-  const openBorrowModal = (asset: Asset) => {
-    setSelectedAsset(asset);
-    setIsBorrowModalOpen(true);
-  };
+  // Filter assets based on type
+  const filteredAssets = assets.filter(asset => {
+    if (type === 'supply') {
+      // For supply view, show all assets
+      return true;
+    } else if (type === 'borrow') {
+      // For borrow view, show all assets
+      return true;
+    }
+    return true;
+  });
 
   return (
     <div className="overflow-x-auto">
@@ -271,7 +426,7 @@ const AssetList = ({ type }: AssetListProps) => {
           </tr>
         </thead>
         <tbody>
-          {isLoading || isAssetLengthLoading ? (
+          {isLoading ? (
             <tr>
               <td colSpan={6} className="text-center py-4">
                 <div className="flex justify-center">
@@ -279,16 +434,22 @@ const AssetList = ({ type }: AssetListProps) => {
                 </div>
               </td>
             </tr>
-          ) : assets.length === 0 ? (
+          ) : filteredAssets.length === 0 ? (
             <tr><td colSpan={6} className="text-center py-4">No assets available.</td></tr>
           ) : (
-            assets.map((asset) => (
+            filteredAssets.map((asset) => (
               <AssetRow
-                key={asset.assetAddress}
+                key={asset.pid}
                 asset={asset}
                 type={type}
-                onSupplyClick={() => openSupplyModal(asset)}
-                onBorrowClick={() => openBorrowModal(asset)}
+                onSupply={() => {
+                  setSelectedAsset(asset);
+                  setIsSupplyModalOpen(true);
+                }}
+                onBorrow={() => {
+                  setSelectedAsset(asset);
+                  setIsBorrowModalOpen(true);
+                }}
                 onCollateralToggle={handleCollateralToggle}
               />
             ))
@@ -302,13 +463,21 @@ const AssetList = ({ type }: AssetListProps) => {
             isOpen={isSupplyModalOpen}
             onClose={() => setIsSupplyModalOpen(false)}
             asset={selectedAsset}
-            onSuccess={fetchAllAssets}
+            onSuccess={() => {
+              if (selectedAsset) {
+                updateSingleAsset(selectedAsset);
+              }
+            }}
           />
           <BorrowModal
             isOpen={isBorrowModalOpen}
             onClose={() => setIsBorrowModalOpen(false)}
             asset={selectedAsset}
-            onSuccess={fetchAllAssets}
+            onSuccess={() => {
+              if (selectedAsset) {
+                updateSingleAsset(selectedAsset);
+              }
+            }}
           />
         </>
       )}
