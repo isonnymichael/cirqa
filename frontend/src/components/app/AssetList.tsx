@@ -8,6 +8,23 @@ import { useSendTransaction } from 'thirdweb/react';
 import { formatUnits } from 'ethers';
 import { cirqaProtocolContract } from '@/lib/contracts';
 import { kiiTestnet } from '@/lib/chain';
+import SupplyModal from './SupplyModal';
+import BorrowModal from './BorrowModal';
+
+type Asset = {
+  pid: bigint;
+  assetAddress: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  walletBalance: bigint;
+  supplied: bigint;
+  borrowed: bigint;
+  allocPoint?: bigint;
+  totalAllocPoint?: bigint;
+  available?: bigint;
+  collateralEnabled?: boolean;
+};
 
 type AssetListProps = {
   type: 'supply' | 'borrow';
@@ -19,128 +36,25 @@ const formatDisplayValue = (value: any, decimals = 18, prefix = '', suffix = '')
   return `${prefix}${formatted}${suffix}`;
 };
 
-const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => {
-  const account = useActiveAccount();
-  const { mutate, isPending } = useSendTransaction();
-  const [assetData, setAssetData] = useState<{ name: string, symbol: string, decimals: number, walletBalance: bigint, supplied: bigint, borrowed: bigint, allocPoint?: bigint, totalAllocPoint?: bigint, available?: bigint, collateralEnabled?: boolean } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const AssetRow = ({ asset, type, onSupplyClick, onBorrowClick, onCollateralToggle }: { asset: Asset, type: 'supply' | 'borrow', onSupplyClick: () => void, onBorrowClick: () => void, onCollateralToggle: (pid: bigint, enabled: boolean) => Promise<void> }) => {
+  const { name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint, collateralEnabled } = asset;
   const [collateralLoading, setCollateralLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchAssetData = async () => {
-      setIsLoading(true);
-      try {
-        const assetInfo = await readContract({
-          contract: cirqaProtocolContract,
-          method: 'function assetInfo(uint256) view returns (address asset, uint256 allocPoint, uint256 lastRewardTime, uint256 accCirqaPerShare, uint256 totalPoints)',
-          params: [pid],
-        });
-        const assetAddress = assetInfo[0];
-        const allocPoint = assetInfo[1];
-        const totalAllocPoint = await readContract({
-          contract: cirqaProtocolContract,
-          method: 'function totalAllocPoint() view returns (uint256)',
-          params: [],
-        });
-        const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
-        const [name, symbol, decimals] = await Promise.all([
-          readContract({ contract: assetContract, method: 'function name() view returns (string)', params: [] }),
-          readContract({ contract: assetContract, method: 'function symbol() view returns (string)', params: [] }),
-          readContract({ contract: assetContract, method: 'function decimals() view returns (uint8)', params: [] }),
-        ]);
-        let walletBalance = BigInt(0);
-        let supplied = BigInt(0);
-        let borrowed = BigInt(0);
-        let available = BigInt(0);
-        if (account?.address) {
-          const [balance, userInfo] = await Promise.all([
-            readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [account.address] }),
-            readContract({ contract: cirqaProtocolContract, method: 'function userInfo(uint256, address) view returns (uint256 supplied, uint256 borrowed)', params: [pid, account.address] })
-          ]);
-          walletBalance = balance;
-          supplied = userInfo[0];
-          borrowed = userInfo[1];
-        }
-        // Fetch available liquidity for borrow
-        if (type === 'borrow') {
-          try {
-            available = await readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [cirqaProtocolContract.address] });
-          } catch (e) {
-            available = BigInt(0);
-          }
-        }
-        let collateralEnabled = false;
-        if (type === 'supply' && account?.address) {
-          try {
-            collateralEnabled = await readContract({
-              contract: cirqaProtocolContract,
-              method: 'function isCollateral(uint256,address) view returns (bool)',
-              params: [pid, account.address]
-            });
-          } catch (e) {
-            collateralEnabled = false;
-          }
-        }
-        setAssetData({ name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint, available, collateralEnabled });
-      } catch (error) {
-        console.error('Failed to fetch asset data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchAssetData();
-  }, [pid, account, type]);
-
-  const handleToggleCollateral = async () => {
-    if (!account?.address || !assetData) return;
-    setCollateralLoading(true);
-    try {
-      const transaction = prepareContractCall({
-        contract: cirqaProtocolContract,
-        method: 'function setCollateralStatus(uint256,bool)',
-        params: [pid, !assetData.collateralEnabled]
-      });
-      mutate(transaction, {
-        onSuccess: async (receipt) => {
-          console.log(receipt);
-          setAssetData({ ...assetData, collateralEnabled: !assetData.collateralEnabled });
-          // show notification here
-        },
-        onError: (error) => {
-          // show error notification here
-          console.error('Transaction Failed:', error);
-        },
-        onSettled: () => {
-          setCollateralLoading(false);
-        }
-      });
-    } catch (e) {
-      console.error('Failed to send transaction:', e);
-      setCollateralLoading(false);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <tr className="border-b border-gray-800">
-        <td colSpan={6} className="py-4 text-center">
-          <div className="flex justify-center">
-            <Spinner />
-          </div>
-        </td>
-      </tr>
-    );
-  }
-
-  if (!assetData) return null; // Or some fallback UI
-
-  const { name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint } = assetData;
   let shareOfPool = null;
   if (allocPoint && totalAllocPoint && totalAllocPoint > BigInt(0)) {
     shareOfPool = type === 'supply'
       ? Number(allocPoint) / Number(totalAllocPoint) * 100
       : Number(allocPoint) / Number(totalAllocPoint) * 100 / 2;
   }
+
+  const handleToggleCollateral = async () => {
+      setCollateralLoading(true);
+      try {
+        await onCollateralToggle(asset.pid, !collateralEnabled);
+      } finally {
+        setCollateralLoading(false);
+      }
+    };
 
   return (
     <tr className="border-b border-gray-800">
@@ -171,7 +85,7 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
           <td className="py-4">
             <div className="flex items-center">
               <button
-                className={`cursor-pointer w-10 h-6 rounded-full relative mr-2 ${assetData.collateralEnabled ? 'bg-green-500' : 'bg-gray-700'}`}
+                className={`cursor-pointer w-10 h-6 rounded-full relative mr-2 ${collateralEnabled ? 'bg-green-500' : 'bg-gray-700'}`}
                 onClick={handleToggleCollateral}
                 disabled={collateralLoading}
               >
@@ -184,12 +98,11 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
                   </span>
                 ) : (
                   <span
-                    className={`absolute left-1 top-1 w-4 h-4 rounded-full transition-transform duration-300 ${assetData.collateralEnabled ? 'translate-x-4 bg-white' : 'bg-gray-400'}`}
+                    className={`absolute left-1 top-1 w-4 h-4 rounded-full transition-transform duration-300 ${collateralEnabled ? 'translate-x-4 bg-white' : 'bg-gray-400'}`}
                   ></span>
                 )}
-                <div className={`absolute left-1 top-1 w-4 h-4 rounded-full transition-all duration-200 ${assetData.collateralEnabled ? 'bg-white left-5' : 'bg-white'}`}></div>
+                <div className={`absolute left-1 top-1 w-4 h-4 rounded-full transition-all duration-200 ${collateralEnabled ? 'bg-white left-5' : 'bg-white'}`}></div>
               </button>
-              <span className="text-sm">{assetData.collateralEnabled ? 'Enabled' : 'Disabled'}</span>
             </div>
           </td>
         </>
@@ -200,13 +113,16 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
             <div className="text-sm text-gray-400">{symbol}</div>
           </td>
           <td className="py-4">
-            <div className="font-medium">{formatDisplayValue(assetData.available, decimals)}</div>
+            <div className="font-medium">{formatDisplayValue(asset.available, decimals)}</div>
             <div className="text-sm text-gray-400">{symbol}</div>
           </td>
         </>
       )}
       <td className="py-4 text-right">
-        <button className="cursor-pointer btn-primary hover:bg-accent hover:text-white transition-all">
+        <button
+          className="cursor-pointer btn-primary hover:bg-accent hover:text-white transition-all"
+          onClick={type === 'supply' ? onSupplyClick : onBorrowClick}
+        >
           {type === 'supply' ? 'Supply' : 'Borrow'}
         </button>
       </td>
@@ -215,11 +131,121 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
 };
 
 const AssetList = ({ type }: AssetListProps) => {
-  const { data: assetLength, isLoading } = useReadContract({
+  const account = useActiveAccount();
+  const { data: assetLength, isLoading: isAssetLengthLoading } = useReadContract({
     contract: cirqaProtocolContract,
     method: 'function getAssetsLength() view returns (uint256)',
     params: [],
   });
+
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
+  const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const { mutate: sendTransaction } = useSendTransaction();
+
+  const fetchAllAssets = async () => {
+    if (!assetLength) return;
+    setIsLoading(true);
+    try {
+      const assetsData = await Promise.all(
+        [...Array(Number(assetLength))].map(async (_, i) => {
+          const pid = BigInt(i);
+          const assetInfo = await readContract({
+            contract: cirqaProtocolContract,
+            method: 'function assetInfo(uint256) view returns (address asset, uint256 allocPoint, uint256 lastRewardTime, uint256 accCirqaPerShare, uint256 totalPoints)',
+            params: [pid],
+          });
+          const assetAddress = assetInfo[0];
+          const allocPoint = assetInfo[1];
+          const totalAllocPoint = await readContract({
+            contract: cirqaProtocolContract,
+            method: 'function totalAllocPoint() view returns (uint256)',
+            params: [],
+          });
+          const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
+          const [name, symbol, decimals] = await Promise.all([
+            readContract({ contract: assetContract, method: 'function name() view returns (string)', params: [] }),
+            readContract({ contract: assetContract, method: 'function symbol() view returns (string)', params: [] }),
+            readContract({ contract: assetContract, method: 'function decimals() view returns (uint8)', params: [] }),
+          ]);
+
+          let walletBalance = BigInt(0);
+          let supplied = BigInt(0);
+          let borrowed = BigInt(0);
+          let available = BigInt(0);
+          let collateralEnabled = false;
+
+          if (account?.address) {
+            const [balance, userInfo, isCollateral] = await Promise.all([
+              readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [account.address] }),
+              readContract({ contract: cirqaProtocolContract, method: 'function userInfo(uint256, address) view returns (uint256 supplied, uint256 borrowed)', params: [pid, account.address] }),
+              readContract({ contract: cirqaProtocolContract, method: 'function isCollateral(uint256,address) view returns (bool)', params: [pid, account.address] })
+            ]);
+            walletBalance = balance;
+            supplied = userInfo[0];
+            borrowed = userInfo[1];
+            collateralEnabled = isCollateral;
+
+            if (type === 'borrow') {
+              try {
+                available = await readContract({ contract: assetContract, method: 'function balanceOf(address) view returns (uint256)', params: [cirqaProtocolContract.address] });
+              } catch (e) {
+                available = BigInt(0);
+              }
+            }
+          }
+
+          return { pid, assetAddress, name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint, available, collateralEnabled };
+        })
+      );
+      setAssets(assetsData);
+    } catch (error) {
+      console.error('Failed to fetch assets:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (assetLength) {
+      fetchAllAssets();
+    }
+  }, [assetLength, account]);
+
+  const handleCollateralToggle = (pid: bigint, enabled: boolean) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!account) {
+        return reject(new Error("Account not connected"));
+      }
+      const transaction = prepareContractCall({
+        contract: cirqaProtocolContract,
+        method: 'function setCollateralStatus(uint256,bool)',
+        params: [pid, enabled]
+      });
+      sendTransaction(transaction, {
+        onSuccess: () => {
+          fetchAllAssets();
+          resolve();
+        },
+        onError: (error) => {
+          console.error('Collateral toggle failed', error);
+          reject(error);
+        },
+      });
+    });
+  };
+
+  const openSupplyModal = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsSupplyModalOpen(true);
+  };
+
+  const openBorrowModal = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsBorrowModalOpen(true);
+  };
 
   return (
     <div className="overflow-x-auto">
@@ -244,7 +270,7 @@ const AssetList = ({ type }: AssetListProps) => {
           </tr>
         </thead>
         <tbody>
-          {isLoading ? (
+          {isLoading || isAssetLengthLoading ? (
             <tr>
               <td colSpan={6} className="text-center py-4">
                 <div className="flex justify-center">
@@ -252,17 +278,39 @@ const AssetList = ({ type }: AssetListProps) => {
                 </div>
               </td>
             </tr>
-          ) : !assetLength ? (
-            <tr><td colSpan={6} className="text-center py-4">Loading assets...</td></tr>
-          ) : Number(assetLength) === 0 ? (
+          ) : assets.length === 0 ? (
             <tr><td colSpan={6} className="text-center py-4">No assets available.</td></tr>
           ) : (
-            [...Array(Number(assetLength))].map((_, i) => (
-              <AssetRow key={i} pid={BigInt(i)} type={type} />
+            assets.map((asset) => (
+              <AssetRow
+                key={asset.assetAddress}
+                asset={asset}
+                type={type}
+                onSupplyClick={() => openSupplyModal(asset)}
+                onBorrowClick={() => openBorrowModal(asset)}
+                onCollateralToggle={handleCollateralToggle}
+              />
             ))
           )}
         </tbody>
       </table>
+
+      {selectedAsset && (
+        <>
+          <SupplyModal
+            isOpen={isSupplyModalOpen}
+            onClose={() => setIsSupplyModalOpen(false)}
+            asset={selectedAsset}
+            onSuccess={fetchAllAssets}
+          />
+          <BorrowModal
+            isOpen={isBorrowModalOpen}
+            onClose={() => setIsBorrowModalOpen(false)}
+            asset={selectedAsset}
+            onSuccess={fetchAllAssets}
+          />
+        </>
+      )}
     </div>
   );
 };
