@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import Spinner from '@/app/Spinner';
 import { useActiveAccount, useReadContract } from 'thirdweb/react';
-import { getContract, readContract } from 'thirdweb';
+import { getContract, readContract, prepareContractCall } from 'thirdweb';
+import { useSendTransaction } from 'thirdweb/react';
 import { formatUnits } from 'ethers';
 import { cirqaProtocolContract } from '@/lib/contracts';
 import { kiiTestnet } from '@/lib/chain';
@@ -20,6 +21,7 @@ const formatDisplayValue = (value: any, decimals = 18, prefix = '', suffix = '')
 
 const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => {
   const account = useActiveAccount();
+  const { mutate, isPending } = useSendTransaction();
   const [assetData, setAssetData] = useState<{ name: string, symbol: string, decimals: number, walletBalance: bigint, supplied: bigint, borrowed: bigint, allocPoint?: bigint, totalAllocPoint?: bigint, available?: bigint, collateralEnabled?: boolean } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [collateralLoading, setCollateralLoading] = useState(false);
@@ -41,16 +43,6 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
           params: [],
         });
         const assetContract = getContract({ client: cirqaProtocolContract.client, chain: kiiTestnet, address: assetAddress });
-        try {
-          const tokenUri = await readContract({
-            contract: assetContract,
-            method: 'function tokenURI(uint256) view returns (string)',
-            params: [BigInt(1)],
-          });
-          console.log(`[PID: ${pid}] Token URI:`, tokenUri);
-        } catch (e) {
-          console.log(`[PID: ${pid}] Could not fetch tokenURI. It might not be implemented on this contract.`);
-        }
         const [name, symbol, decimals] = await Promise.all([
           readContract({ contract: assetContract, method: 'function name() view returns (string)', params: [] }),
           readContract({ contract: assetContract, method: 'function symbol() view returns (string)', params: [] }),
@@ -103,15 +95,27 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
     if (!account?.address || !assetData) return;
     setCollateralLoading(true);
     try {
-      await readContract({
+      const transaction = prepareContractCall({
         contract: cirqaProtocolContract,
         method: 'function setCollateralStatus(uint256,bool)',
         params: [pid, !assetData.collateralEnabled]
       });
-      setAssetData({ ...assetData, collateralEnabled: !assetData.collateralEnabled });
+      mutate(transaction, {
+        onSuccess: async (receipt) => {
+          console.log(receipt);
+          setAssetData({ ...assetData, collateralEnabled: !assetData.collateralEnabled });
+          // show notification here
+        },
+        onError: (error) => {
+          // show error notification here
+          console.error('Transaction Failed:', error);
+        },
+        onSettled: () => {
+          setCollateralLoading(false);
+        }
+      });
     } catch (e) {
-      // handle error
-    } finally {
+      console.error('Failed to send transaction:', e);
       setCollateralLoading(false);
     }
   };
@@ -167,11 +171,23 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
           <td className="py-4">
             <div className="flex items-center">
               <button
-                className={`w-10 h-6 rounded-full relative mr-2 ${assetData.collateralEnabled ? 'bg-green-500' : 'bg-gray-700'}`}
+                className={`cursor-pointer w-10 h-6 rounded-full relative mr-2 ${assetData.collateralEnabled ? 'bg-green-500' : 'bg-gray-700'}`}
                 onClick={handleToggleCollateral}
                 disabled={collateralLoading}
               >
-                <div className={`absolute left-1 top-1 w-4 h-4 rounded-full transition-all duration-200 ${assetData.collateralEnabled ? 'bg-white left-5' : 'bg-accent'}`}></div>
+                {collateralLoading ? (
+                  <span className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                  </span>
+                ) : (
+                  <span
+                    className={`absolute left-1 top-1 w-4 h-4 rounded-full transition-transform duration-300 ${assetData.collateralEnabled ? 'translate-x-4 bg-white' : 'bg-gray-400'}`}
+                  ></span>
+                )}
+                <div className={`absolute left-1 top-1 w-4 h-4 rounded-full transition-all duration-200 ${assetData.collateralEnabled ? 'bg-white left-5' : 'bg-white'}`}></div>
               </button>
               <span className="text-sm">{assetData.collateralEnabled ? 'Enabled' : 'Disabled'}</span>
             </div>
@@ -190,7 +206,7 @@ const AssetRow = ({ pid, type }: { pid: bigint, type: 'supply' | 'borrow' }) => 
         </>
       )}
       <td className="py-4 text-right">
-        <button className="btn-primary hover:bg-accent hover:text-white transition-all">
+        <button className="cursor-pointer btn-primary hover:bg-accent hover:text-white transition-all">
           {type === 'supply' ? 'Supply' : 'Borrow'}
         </button>
       </td>
