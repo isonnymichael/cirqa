@@ -10,6 +10,8 @@ import { cirqaProtocolContract } from '@/lib/contracts';
 import { kiiTestnet } from '@/lib/chain';
 import SupplyModal from './SupplyModal';
 import BorrowModal from './BorrowModal';
+import WithdrawModal from './WithdrawModal';
+import RepayModal from './RepayModal';
 
 type Asset = {
   pid: bigint;
@@ -36,11 +38,13 @@ const formatDisplayValue = (value: any, decimals = 18, prefix = '', suffix = '')
   return `${prefix}${formatted}${suffix}`;
 };
 
-const AssetRow = ({ asset, type, onSupply, onBorrow, onCollateralToggle }: { 
+const AssetRow = ({ asset, type, onSupply, onBorrow, onWithdraw, onRepay, onCollateralToggle }: { 
   asset: Asset, 
   type: 'supply' | 'borrow', 
   onSupply: () => void, 
   onBorrow: () => void, 
+  onWithdraw: () => void,
+  onRepay: () => void,
   onCollateralToggle: (pid: bigint, enabled: boolean) => Promise<void> 
 }) => {
   const { name, symbol, decimals, walletBalance, supplied, borrowed, allocPoint, totalAllocPoint, collateralEnabled } = asset;
@@ -121,18 +125,57 @@ const AssetRow = ({ asset, type, onSupply, onBorrow, onCollateralToggle }: {
             <div className="text-sm text-gray-400">{symbol}</div>
           </td>
           <td className="py-4">
-            <div className="font-medium">{formatDisplayValue(asset.available, decimals)}</div>
+            <div className="font-medium">
+              {type === 'borrow' && asset.collateralEnabled === false
+                ? formatDisplayValue(BigInt(0), decimals)
+                : formatDisplayValue(asset.available, decimals)}
+            </div>
             <div className="text-sm text-gray-400">{symbol}</div>
           </td>
         </>
       )}
       <td className="py-4 text-right">
-        <button
-          className="cursor-pointer btn-primary hover:bg-accent hover:text-white transition-all"
-          onClick={type === 'supply' ? onSupply : onBorrow}
-        >
-          {type === 'supply' ? 'Supply' : 'Borrow'}
-        </button>
+        {type === 'supply' ? (
+          <div className="flex justify-end space-x-2">
+            <button
+              onClick={onSupply}
+              className="btn-primary transition-all cursor-pointer hover:bg-accent hover:text-white"
+            >
+              Supply
+            </button>
+            {asset.supplied > BigInt(0) && (
+              <button
+                onClick={onWithdraw}
+                className="btn-secondary transition-all cursor-pointer hover:bg-accent hover:text-white"
+              >
+                Withdraw
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex justify-end space-x-2">
+            <button
+              onClick={onBorrow}
+              disabled={Number(asset.available) === 0}
+              className={`
+                btn-primary transition-all
+                ${Number(asset.available) === 0
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:bg-accent hover:text-white'}
+              `}
+            >
+              Borrow
+            </button>
+            {asset.borrowed > BigInt(0) && (
+              <button
+                onClick={onRepay}
+                className="btn-secondary transition-all cursor-pointer hover:bg-accent hover:text-white"
+              >
+                Repay
+              </button>
+            )}
+          </div>
+        )}
       </td>
     </tr>
   );
@@ -150,6 +193,8 @@ const AssetList = ({ type }: AssetListProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const { mutate: sendTransaction } = useSendTransaction();
 
@@ -450,6 +495,14 @@ const AssetList = ({ type }: AssetListProps) => {
                   setSelectedAsset(asset);
                   setIsBorrowModalOpen(true);
                 }}
+                onWithdraw={() => {
+                  setSelectedAsset(asset);
+                  setIsWithdrawModalOpen(true);
+                }}
+                onRepay={() => {
+                  setSelectedAsset(asset);
+                  setIsRepayModalOpen(true);
+                }}
                 onCollateralToggle={handleCollateralToggle}
               />
             ))
@@ -472,6 +525,26 @@ const AssetList = ({ type }: AssetListProps) => {
           <BorrowModal
             isOpen={isBorrowModalOpen}
             onClose={() => setIsBorrowModalOpen(false)}
+            asset={selectedAsset}
+            onSuccess={() => {
+              if (selectedAsset) {
+                updateSingleAsset(selectedAsset);
+              }
+            }}
+          />
+          <WithdrawModal
+            isOpen={isWithdrawModalOpen}
+            onClose={() => setIsWithdrawModalOpen(false)}
+            asset={selectedAsset}
+            onSuccess={() => {
+              if (selectedAsset) {
+                updateSingleAsset(selectedAsset);
+              }
+            }}
+          />
+          <RepayModal
+            isOpen={isRepayModalOpen}
+            onClose={() => setIsRepayModalOpen(false)}
             asset={selectedAsset}
             onSuccess={() => {
               if (selectedAsset) {
