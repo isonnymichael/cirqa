@@ -41,8 +41,8 @@ export default function Home() {
               LENDING PROTOCOL FOR RWAs
             </h1>
             <p className="text-lg sm:text-xl md:text-2xl text-gray-400 mb-8 sm:mb-12 max-w-3xl mx-auto">
-              bagian eamless and secure lending, borrowing, and yield for crypto native RWA on KiiChain with Cirqa.
-            </p>
+                Seamless and secure lending, borrowing, and yield generation for crypto-native Real World Assets (RWAs) on KiiChain with Cirqa Protocol.
+              </p>
             <Link href="/app" className="btn-primary text-base sm:text-lg py-2 sm:py-3 px-6 sm:px-8 bg-accent hover:bg-accent/90 hover:scale-105 transition-all duration-300 inline-flex items-center rounded-lg shadow-lg shadow-accent/20">
               <span>Launch App</span>
               <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -72,15 +72,15 @@ export default function Home() {
                 <div className="text-accent mb-3 sm:mb-4">
                   <FaChartLine size={32} className="sm:w-10 sm:h-10" />
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">8,750+</h3>
-                <p className="text-gray-400 text-sm sm:text-base">Active Users</p>
+                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">10B</h3>
+                <p className="text-gray-400 text-sm sm:text-base">Max CIRQA Supply</p>
               </div>
               <div className="p-4 sm:p-6 flex flex-col items-center transform hover:scale-105 transition-transform duration-300">
                 <div className="text-accent mb-3 sm:mb-4">
                   <RiExchangeDollarFill size={32} className="sm:w-10 sm:h-10" />
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">125,000+</h3>
-                <p className="text-gray-400 text-sm sm:text-base">Total Transactions</p>
+                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">0.158</h3>
+                <p className="text-gray-400 text-sm sm:text-base">CIRQA Rewards Per Second</p>
               </div>
             </div>
           </div>
@@ -103,25 +103,25 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Decentralized Lending and Borrowing</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base">
-                  Users can lend and borrow cryptocurrencies through liquidity pools, earning interest or using crypto assets as collateral.
+                  Supply assets to earn interest or borrow against your collateral with transparent terms and competitive rates on the Cirqa Protocol.
                 </p>
               </div>
               <div className="card p-4 sm:p-6 hover:border-accent transition-all duration-300 transform hover:-translate-y-2 hover:shadow-lg hover:shadow-accent/10">
                 <div className="text-accent mb-4 sm:mb-6 flex justify-center">
                   <FaChartLine size={36} className="sm:w-12 sm:h-12" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Algorithmic Interest Rates</h3>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">CIRQA Token Rewards</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base">
-                  Cirqa uses an algorithmic model to set interest rates in real-time based on the supply and demand for each asset in the market.
+                  Earn CIRQA token rewards for supplying and borrowing assets. The protocol distributes rewards based on allocation points and your participation.
                 </p>
               </div>
               <div className="card p-4 sm:p-6 hover:border-accent transition-all duration-300 transform hover:-translate-y-2 hover:shadow-lg hover:shadow-accent/10">
                 <div className="text-accent mb-4 sm:mb-6 flex justify-center">
                   <FaLock size={36} className="sm:w-12 sm:h-12" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Over-collateralization</h3>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Flexible Collateral Options</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base">
-                  Borrowers provide collateral that exceeds the value of the loan. This ensures that the protocol remains solvent even if the borrower fails to repay.
+                  Choose which assets to use as collateral with our setCollateralStatus feature, giving you complete control over your lending and borrowing strategy.
                 </p>
               </div>
             </div>
@@ -147,27 +147,27 @@ export default function Home() {
                 <div className="text-accent mb-4 sm:mb-6 flex justify-center">
                   <MdSecurity size={36} className="sm:w-12 sm:h-12" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Security Audits</h3>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Protocol Fee Protection</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base">
-                  Our team of specialists has meticulously audited the Cirqa smart contracts, ensuring a secure and reliable platform you can trust.
+                  Our protocol implements a transparent fee system with a maximum cap of 10%, ensuring fair treatment for all users while maintaining protocol sustainability.
                 </p>
               </div>
               <div className="p-4 sm:p-6 border border-transparent hover:border-accent transition-all duration-300 transform hover:-translate-y-2 rounded-lg bg-gray-800/50 backdrop-blur-sm">
                 <div className="text-accent mb-4 sm:mb-6 flex justify-center">
                   <FaCode size={36} className="sm:w-12 sm:h-12" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Open Source</h3>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">OpenZeppelin Standards</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base">
-                  The smart contracts are open source, providing complete transparency and allowing the community to verify and contribute to their security.
+                  Built on industry-standard OpenZeppelin contracts for ownership and token management, providing battle-tested security foundations for your assets.
                 </p>
               </div>
               <div className="p-4 sm:p-6 border border-transparent hover:border-accent transition-all duration-300 transform hover:-translate-y-2 rounded-lg bg-gray-800/50 backdrop-blur-sm">
                 <div className="text-accent mb-4 sm:mb-6 flex justify-center">
                   <MdOutlinePublic size={36} className="sm:w-12 sm:h-12" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Decentralized</h3>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Transparent Reward System</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base">
-                  The protocol is decentralized, reducing the risk of single points of failure and promoting trust and inclusivity.
+                  Our reward distribution system is fully transparent with on-chain verification, allowing users to track and claim their CIRQA rewards at any time.
                 </p>
               </div>
             </div>
@@ -196,25 +196,25 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-4 text-center">Supply Assets</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base md:text-lg">
-                  Connect your wallet and supply your crypto assets to the protocol to contribute to the liquidity pool and start earning.
+                  Connect your wallet and supply your crypto assets to the Cirqa Protocol to earn CIRQA token rewards and enable borrowing capabilities.
                 </p>
               </div>
               <div className="card p-4 sm:p-6 md:p-8 hover:border-accent transition-all duration-500 transform hover:-translate-y-3 hover:shadow-xl hover:shadow-accent/20">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-accent rounded-full flex items-center justify-center text-xl sm:text-2xl md:text-3xl font-bold mx-auto mb-4 sm:mb-6 shadow-lg shadow-accent/30 border-4 border-background">
                   2
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-4 text-center">Earn Interest</h3>
+                <h3 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-4 text-center">Set Collateral Status</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base md:text-lg">
-                  Watch your investments grow with competitive interest rates. Earn passive income while supporting the DeFi ecosystem.
+                  Choose which of your supplied assets to use as collateral with our flexible setCollateralStatus feature, giving you complete control.
                 </p>
               </div>
               <div className="card p-4 sm:p-6 md:p-8 hover:border-accent transition-all duration-500 transform hover:-translate-y-3 hover:shadow-xl hover:shadow-accent/20">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-accent rounded-full flex items-center justify-center text-xl sm:text-2xl md:text-3xl font-bold mx-auto mb-4 sm:mb-6 shadow-lg shadow-accent/30 border-4 border-background">
                   3
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-4 text-center">Borrow Assets</h3>
+                <h3 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-4 text-center">Borrow & Earn Rewards</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base md:text-lg">
-                  Need liquidity? Borrow assets easily and securely using your supplied assets as collateral, with transparent terms.
+                  Borrow assets with transparent fees (max 10%) and earn additional CIRQA rewards based on your borrowing activity, with rewards claimable anytime.
                 </p>
               </div>
             </div>
@@ -234,9 +234,9 @@ export default function Home() {
           </div>
         </div>
         <div className="container mx-auto text-center relative z-10">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-6 text-white">Ready to Revolutionize Your Finance?</h2>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-6 text-white">Ready to Earn CIRQA Rewards?</h2>
           <p className="text-base sm:text-lg md:text-xl text-white/80 mb-6 sm:mb-10 max-w-2xl mx-auto">
-            Join thousands of users who are already benefiting from Cirqa's secure and efficient DeFi platform. Start your journey today!
+            Join the Cirqa Protocol and start earning CIRQA tokens by supplying and borrowing assets. With transparent fees, flexible collateral options, and a secure reward system, your DeFi journey starts here!
           </p>
           <Link href="/app" className="inline-flex items-center justify-center text-base sm:text-lg md:text-xl py-3 sm:py-4 md:py-5 px-8 sm:px-10 md:px-12 bg-white text-black hover:bg-white/90 transition-all duration-300 rounded-full font-bold shadow-lg shadow-black/20 transform hover:translate-y-[-4px] hover:shadow-xl">
             <span>Get Started Now</span>
@@ -245,7 +245,7 @@ export default function Home() {
             </svg>
           </Link>
           <p className="text-white/70 mt-4 sm:mt-8 text-xs sm:text-sm">
-            No credit card required. Start with as little as you want. Full control of your assets.
+            No credit card required. Protocol fees capped at 10%. Full control of your assets with flexible collateral options. Earn CIRQA rewards on both supply and borrow activities.
           </p>
         </div>
       </div>
