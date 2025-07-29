@@ -61,7 +61,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, asset, o
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-center items-center">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
+      <div className="bg-gray-800 p-6 rounded-lg shadow-xl md:w-full max-w-md">
         <h2 className="text-2xl font-bold mb-4">Withdraw {asset.symbol}</h2>
         <div className="mb-4">
           <label htmlFor="amount" className="block text-sm font-medium text-gray-300 mb-1">Amount</label>
