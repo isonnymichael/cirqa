@@ -65,14 +65,22 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, asset, o
         <h2 className="text-2xl font-bold mb-4">Withdraw {asset.symbol}</h2>
         <div className="mb-4">
           <label htmlFor="amount" className="block text-sm font-medium text-gray-300 mb-1">Amount</label>
-          <input
-            type="text"
-            id="amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-accent"
-            placeholder={`Supplied: ${formatUnits(asset.supplied, asset.decimals)}`}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              id="amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+            <button 
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-accent hover:text-accent-light px-2 py-0.5 rounded"
+              onClick={() => setAmount(formatUnits(asset.supplied, asset.decimals))}
+            >
+              Max
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Supplied: {formatUnits(asset.supplied, asset.decimals)} {asset.symbol}</p>
         </div>
         <div className="flex justify-end space-x-4">
           <button onClick={onClose} className="cursor-pointer btn-secondary">Cancel</button>
