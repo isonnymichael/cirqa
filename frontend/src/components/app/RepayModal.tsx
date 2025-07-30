@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSendTransaction, useActiveAccount } from 'thirdweb/react';
 import { readContract } from 'thirdweb';
 import { prepareContractCall, getContract } from 'thirdweb';
 import { cirqaProtocolContract } from '@/lib/contracts';
 import { parseUnits, formatUnits, MaxUint256 } from 'ethers';
 import { kiiTestnet } from '@/lib/chain';
+import Image from 'next/image';
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -21,6 +22,31 @@ const RepayModal: React.FC<RepayModalProps> = ({ isOpen, onClose, asset, onSucce
   const [isRepaying, setIsRepaying] = useState(false);
   const { mutate: sendTransaction } = useSendTransaction();
   const account = useActiveAccount();
+  const modalRef = useRef<HTMLDivElement>(null);
+  
+  // Reset amount when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setAmount('0');
+    }
+  }, [isOpen]);
+  
+  // Handle click outside to close modal
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+    
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
 
   const handleRepay = async () => {
     if (!asset || !amount || !account) return;
@@ -92,8 +118,17 @@ const RepayModal: React.FC<RepayModalProps> = ({ isOpen, onClose, asset, onSucce
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-center items-center">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl md:w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-4">Repay {asset.symbol}</h2>
+      <div ref={modalRef} className="bg-gray-800 p-6 rounded-lg shadow-xl md:w-full max-w-md relative">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Repay {asset.symbol}</h2>
+          <button 
+            onClick={onClose} 
+            className="text-white hover:text-gray-200 cursor-pointer"
+            aria-label="Close"
+          >
+            <Image src="/close.svg" alt="Close" width={24} height={24} />
+          </button>
+        </div>
         <div className="mb-4">
           <label htmlFor="amount" className="block text-sm font-medium text-gray-300 mb-1">Amount</label>
           <div className="relative">
@@ -105,7 +140,7 @@ const RepayModal: React.FC<RepayModalProps> = ({ isOpen, onClose, asset, onSucce
               className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <button 
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-accent hover:text-accent-light px-2 py-0.5 rounded"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-accent hover:text-accent-light px-2 py-0.5 rounded cursor-pointer"
               onClick={() => setAmount(formatUnits(asset.borrowed, asset.decimals))}
             >
               Max
