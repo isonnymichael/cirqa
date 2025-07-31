@@ -8,6 +8,7 @@ import { cirqaProtocolContract } from '@/lib/contracts';
 import { parseUnits, formatUnits, MaxUint256 } from 'ethers';
 import { kiiTestnet } from '@/lib/chain';
 import Image from 'next/image';
+import { useToast } from "@/components/ToastContext";
 
 interface SupplyModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ const SupplyModal: React.FC<SupplyModalProps> = ({ isOpen, onClose, asset, onSuc
   const { mutate: sendTransaction } = useSendTransaction();
   const account = useActiveAccount();
   const modalRef = useRef<HTMLDivElement>(null);
+  const { showToast } = useToast();
   
   // Reset amount when modal opens
   useEffect(() => {
@@ -69,14 +71,19 @@ const SupplyModal: React.FC<SupplyModalProps> = ({ isOpen, onClose, asset, onSuc
           method: "function approve(address spender, uint256 amount)",
           params: [cirqaProtocolContract.address, MaxUint256], // Unlimited approval
         });
-        
         await new Promise((resolve, reject) => {
-          sendTransaction(approveTx, { 
+          sendTransaction(approveTx, {
             onSuccess: resolve,
-            onError: reject
+            onError: (error) => {
+              showToast(
+                "Supply approval failed!",
+                undefined,
+                "Dismiss"
+              );
+              reject(error);
+            }
           });
         });
-
         setIsApproving(false);
       }
 
@@ -87,27 +94,37 @@ const SupplyModal: React.FC<SupplyModalProps> = ({ isOpen, onClose, asset, onSuc
         method: 'function supply(address,uint256)',
         params: [asset.assetAddress, amountBN],
       });
-
       await new Promise((resolve, reject) => {
         sendTransaction(supplyTransaction, {
           onSuccess: (receipt) => {
-            console.log(receipt);
-            // Add a longer delay before calling onSuccess to allow blockchain to update
+            showToast(
+              "Supply transaction confirmed!",
+              `https://kiichain.explorer/tx/${receipt.transactionHash}`,
+              "View Receipt"
+            );
             setTimeout(() => {
-              console.log('Supply transaction confirmed, updating asset data...');
               onSuccess();
               onClose();
               resolve(receipt);
             }, 5000);
           },
           onError: (error) => {
+            showToast(
+              "Supply transaction failed!",
+              undefined,
+              "Dismiss"
+            );
             console.error('Supply failed', error);
             reject(error);
           },
         });
       });
-
     } catch (error) {
+      showToast(
+        "Failed to prepare supply transaction!",
+        undefined,
+        "Dismiss"
+      );
       console.error('Failed to prepare supply transaction', error);
     } finally {
       setIsApproving(false);

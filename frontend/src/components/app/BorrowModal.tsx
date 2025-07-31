@@ -6,6 +6,7 @@ import { prepareContractCall } from 'thirdweb';
 import { cirqaProtocolContract } from '@/lib/contracts';
 import { parseUnits, formatUnits } from 'ethers';
 import Image from 'next/image';
+import { useToast } from "@/components/ToastContext";
 
 interface BorrowModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ isOpen, onClose, asset, onSuc
   const [isBorrowing, setIsBorrowing] = useState(false);
   const { mutate: sendTransaction } = useSendTransaction();
   const modalRef = useRef<HTMLDivElement>(null);
+  const { showToast } = useToast();
   
   // Reset amount when modal opens
   useEffect(() => {
@@ -70,23 +72,34 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ isOpen, onClose, asset, onSuc
       await new Promise((resolve, reject) => {
         sendTransaction(transaction, {
           onSuccess: (receipt) => {
-            console.log(receipt);
-            // Add a longer delay before calling onSuccess to allow blockchain to update
+            showToast(
+              "Borrow transaction confirmed!",
+              `https://kiichain.explorer/tx/${receipt.transactionHash}`,
+              "View Receipt"
+            );
             setTimeout(() => {
-              console.log('Borrow transaction confirmed, updating asset data...');
               onSuccess();
               onClose();
               resolve(receipt);
             }, 5000);
           },
           onError: (error) => {
+            showToast(
+              "Borrow transaction failed!",
+              undefined,
+              "Dismiss"
+            );
             console.error('Borrow failed', error);
             reject(error);
           },
         });
       });
-
     } catch (error) {
+      showToast(
+        "Failed to prepare borrow transaction!",
+        undefined,
+        "Dismiss"
+      );
       console.error('Failed to prepare borrow transaction', error);
     } finally {
       setIsBorrowing(false);

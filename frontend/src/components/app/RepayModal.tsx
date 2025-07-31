@@ -8,6 +8,7 @@ import { cirqaProtocolContract } from '@/lib/contracts';
 import { parseUnits, formatUnits, MaxUint256 } from 'ethers';
 import { kiiTestnet } from '@/lib/chain';
 import Image from 'next/image';
+import { useToast } from "@/components/ToastContext";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ const RepayModal: React.FC<RepayModalProps> = ({ isOpen, onClose, asset, onSucce
   const { mutate: sendTransaction } = useSendTransaction();
   const account = useActiveAccount();
   const modalRef = useRef<HTMLDivElement>(null);
+  const { showToast } = useToast();
   
   // Reset amount when modal opens
   useEffect(() => {
@@ -68,14 +70,19 @@ const RepayModal: React.FC<RepayModalProps> = ({ isOpen, onClose, asset, onSucce
           method: "function approve(address spender, uint256 amount)",
           params: [cirqaProtocolContract.address, MaxUint256], // Unlimited approval
         });
-        
         await new Promise((resolve, reject) => {
-          sendTransaction(approveTx, { 
+          sendTransaction(approveTx, {
             onSuccess: resolve,
-            onError: reject
+            onError: (error) => {
+              showToast(
+                "Repay approval failed!",
+                undefined,
+                "Dismiss"
+              );
+              reject(error);
+            }
           });
         });
-
         setIsApproving(false);
       }
 
@@ -86,27 +93,37 @@ const RepayModal: React.FC<RepayModalProps> = ({ isOpen, onClose, asset, onSucce
         method: 'function repay(address,uint256)',
         params: [asset.assetAddress, amountBN],
       });
-
       await new Promise((resolve, reject) => {
         sendTransaction(repayTransaction, {
           onSuccess: (receipt) => {
-            console.log(receipt);
-            // Add a longer delay before calling onSuccess to allow blockchain to update
+            showToast(
+              "Repay transaction confirmed!",
+              `https://kiichain.explorer/tx/${receipt.transactionHash}`,
+              "View Receipt"
+            );
             setTimeout(() => {
-              console.log('Repay transaction confirmed, updating asset data...');
               onSuccess();
               onClose();
               resolve(receipt);
             }, 5000);
           },
           onError: (error) => {
+            showToast(
+              "Repay transaction failed!",
+              undefined,
+              "Dismiss"
+            );
             console.error('Repay failed', error);
             reject(error);
           },
         });
       });
-
     } catch (error) {
+      showToast(
+        "Failed to prepare repay transaction!",
+        undefined,
+        "Dismiss"
+      );
       console.error('Failed to prepare repay transaction', error);
     } finally {
       setIsApproving(false);
