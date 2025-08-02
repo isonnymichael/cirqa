@@ -1,13 +1,11 @@
 'use client'
 
-import Image from "next/image";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 import { FaLock, FaChartLine, FaCode } from "react-icons/fa";
-import { RiMoneyDollarCircleFill, RiExchangeDollarFill, RiHandCoinFill } from "react-icons/ri";
-import { MdSecurity, MdOutlineVerified, MdOutlinePublic } from "react-icons/md";
+import { RiMoneyDollarCircleFill, RiSecurePaymentFill, RiCommunityFill, RiUserStarFill, RiExchangeDollarFill, RiHandCoinFill } from "react-icons/ri";
+import { MdSecurity, MdOutlinePublic } from "react-icons/md";
 import React, { useState } from 'react';
-import HowItWorks from "@/components/app/HowItWorks";
 
 
 export default function Home() {
@@ -72,31 +70,35 @@ export default function Home() {
           
           <div className="container mx-auto px-4 relative z-10">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 text-center">
+              
               <div className="p-4 sm:p-6 flex flex-col items-center transform hover:scale-105 transition-transform duration-300">
                 <div className="text-accent mb-3 sm:mb-4">
-                  <RiMoneyDollarCircleFill size={32} className="sm:w-10 sm:h-10" />
+                  <RiUserStarFill size={32} className="sm:w-10 sm:h-10" />
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">$12.5M+</h3>
-                <p className="text-gray-400 text-sm sm:text-base">Total Value Locked</p>
+                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">8,420+</h3>
+                <p className="text-gray-400 text-sm sm:text-base">Students Empowered</p>
               </div>
+
               <div className="p-4 sm:p-6 flex flex-col items-center transform hover:scale-105 transition-transform duration-300">
                 <div className="text-accent mb-3 sm:mb-4">
-                  <FaChartLine size={32} className="sm:w-10 sm:h-10" />
+                  <RiCommunityFill size={32} className="sm:w-10 sm:h-10" />
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">10B</h3>
-                <p className="text-gray-400 text-sm sm:text-base">Max CIRQA Supply</p>
+                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">1,200+</h3>
+                <p className="text-gray-400 text-sm sm:text-base">Active Investors</p>
               </div>
+
               <div className="p-4 sm:p-6 flex flex-col items-center transform hover:scale-105 transition-transform duration-300">
                 <div className="text-accent mb-3 sm:mb-4">
-                  <RiExchangeDollarFill size={32} className="sm:w-10 sm:h-10" />
+                  <RiSecurePaymentFill size={32} className="sm:w-10 sm:h-10" />
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">0.158</h3>
-                <p className="text-gray-400 text-sm sm:text-base">CIRQA Rewards Per Second</p>
+                <h3 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">$5.7M</h3>
+                <p className="text-gray-400 text-sm sm:text-base">Scholarships Funded</p>
               </div>
+
             </div>
           </div>
         </section>
-        
+
         {/* Features Section */}
         <section className="py-12 sm:py-16 md:py-20 px-4 bg-gradient-to-b from-background to-secondary relative overflow-hidden">
           {/* Animated shapes */}
@@ -123,7 +125,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">CIRQA Token Rewards</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base">
-                  Earn CIRQA token rewards for supplying and borrowing assets. The protocol distributes rewards based on allocation points and your participation.
+                  Investors receive CIRQA tokens as rewards for funding student scholarships. The more you contribute, the more CIRQA you earn—aligning financial incentives with social impact.
                 </p>
               </div>
               <div className="card p-4 sm:p-6 hover:border-accent transition-all duration-300 transform hover:-translate-y-2 hover:shadow-lg hover:shadow-accent/10">
@@ -176,9 +178,9 @@ export default function Home() {
                 <div className="text-accent mb-4 sm:mb-6 flex justify-center">
                   <MdOutlinePublic size={36} className="sm:w-12 sm:h-12" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">Transparent Reward System</h3>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-4 text-center">On-Chain Transparency</h3>
                 <p className="text-gray-400 text-center text-sm sm:text-base">
-                  Our reward distribution system is fully transparent with on-chain verification, allowing users to track and claim their CIRQA rewards at any time.
+                  All scholarship funding and CIRQA reward distributions are recorded on-chain, ensuring full transparency. Investors and students can verify transactions and rewards anytime.
                 </p>
               </div>
             </div>
@@ -192,46 +194,54 @@ export default function Home() {
             <div className="absolute bottom-10 right-10 w-30 h-30 sm:w-60 sm:h-60 rounded-full bg-primary blur-3xl animate-pulse duration-7000 delay-1000"></div>
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-40 sm:w-80 sm:h-80 rounded-full bg-purple-500/10 blur-3xl animate-pulse duration-8000"></div>
           </div>
+
           <div className="container mx-auto text-center relative z-10">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-6 text-white">HOW IT WORKS</h2>
             <p className="text-base sm:text-lg md:text-xl text-gray-400 mb-8 sm:mb-12 md:mb-16 max-w-2xl mx-auto">
-              Cirqa makes DeFi simple and accessible for everyone. Follow these three easy steps to start your journey.
+              Cirqa connects students and investors in a decentralized scholarship system powered by blockchain. Here’s how it works:
             </p>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border border-gray-700 hover:border-accent transition-all duration-300">
                 <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <RiMoneyDollarCircleFill className="text-blue-500 text-3xl" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Create a Scholarship</h3>
-                <p className="text-gray-400">Students can create a scholarship by providing an IPFS metadata hash containing their information.</p>
+                <h3 className="text-xl font-semibold mb-2">Apply for Scholarship</h3>
+                <p className="text-gray-400">
+                  Students create a scholarship profile by minting an NFT that stores their credentials and documents.
+                </p>
               </div>
               
               <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border border-gray-700 hover:border-accent transition-all duration-300">
                 <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <RiExchangeDollarFill className="text-blue-500 text-3xl" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Fund a Scholarship</h3>
-                <p className="text-gray-400">Investors can fund scholarships with USDT and receive CIRQA tokens as rewards.</p>
+                <h3 className="text-xl font-semibold mb-2">Invest in a Student</h3>
+                <p className="text-gray-400">
+                  Investors fund scholarships by sending USDT directly to students' NFT contracts, supporting their education goals.
+                </p>
               </div>
               
               <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border border-gray-700 hover:border-accent transition-all duration-300">
                 <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <RiHandCoinFill className="text-blue-500 text-3xl" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Withdraw Funds</h3>
-                <p className="text-gray-400">Students can withdraw USDT from their scholarship when needed.</p>
+                <h3 className="text-xl font-semibold mb-2">Access the Funds</h3>
+                <p className="text-gray-400">
+                  Students can securely withdraw scholarship funds in USDT, with full transparency and traceability on-chain.
+                </p>
               </div>
             </div>
-            
+
             <div className="mt-8 p-4 bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700">
-              <h3 className="text-xl font-semibold mb-2">Reward System</h3>
+              <h3 className="text-xl font-semibold mb-2">Investor Rewards</h3>
               <p className="text-gray-400">
-                For every USDT invested in a scholarship, investors receive CIRQA tokens based on the current reward rate.
-                These tokens can be used for governance and other benefits within the Cirqa ecosystem.
+                For every USDT you invest, you earn CIRQA tokens based on a fixed reward rate. CIRQA tokens grant governance rights and future utility within the Cirqa ecosystem.
               </p>
             </div>
           </div>
         </section>
+
         {/* FAQ Section */}
         <section className="py-12 sm:py-16 md:py-20 px-4 bg-gray-800 relative overflow-hidden">
           <div className="absolute inset-0 opacity-5">
@@ -249,25 +259,17 @@ export default function Home() {
                 },
                 {
                   question: "How do I create a scholarship?",
-                  answer: "As a student, you can create a scholarship by clicking the \"Create New Scholarship\" button, providing an IPFS metadata hash containing your information, and submitting the transaction. You'll receive an NFT representing your scholarship."
+                  answer: "As a student, you can create a scholarship by clicking the \"Create New Scholarship\" button, providing an metadata hash containing your information, and submitting the transaction. You'll receive an NFT representing your scholarship."
                 },
                 {
                   question: "How do I fund a scholarship?",
                   answer: "As an investor, you can browse available scholarships and click the \"Fund\" button on any scholarship you wish to support. Enter the amount of USDT you want to contribute and confirm the transaction. You'll receive CIRQA tokens as a reward."
-                },
-                {
-                  question: "What is IPFS and why is it used?",
-                  answer: "IPFS (InterPlanetary File System) is a decentralized storage system. We use it to store scholarship metadata (student information) in a decentralized way, ensuring that the data remains accessible and tamper-proof."
-                },
-                {
-                  question: "Is there a fee for using the platform?",
-                  answer: "The platform itself doesn't charge fees beyond the standard blockchain transaction fees. 100% of the USDT funded goes directly to the student's scholarship balance."
                 }
               ].map((faq, index) => (
                 <div key={index} className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 hover:border-accent rounded-lg transition-all duration-300">
                   <button 
                     onClick={() => toggleFaq(index)}
-                    className="w-full text-left p-4 sm:p-6 flex justify-between items-center"
+                    className="cursor-pointer w-full text-left p-4 sm:p-6 flex justify-between items-center"
                   >
                     <h3 className="text-lg font-semibold">{faq.question}</h3>
                     <svg 
@@ -287,73 +289,6 @@ export default function Home() {
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-        </section>
-        
-        {/* IPFS Guide Section */}
-        <section className="py-12 sm:py-16 md:py-20 px-4 bg-gradient-to-b from-background to-secondary relative overflow-hidden">
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
-          </div>
-          
-          <div className="container mx-auto relative z-10">
-            <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">IPFS METADATA GUIDE</h2>
-            
-            <div className="max-w-3xl mx-auto bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg p-6 sm:p-8">
-              <p className="text-gray-400 mb-6">
-                When creating a scholarship, you need to provide an IPFS hash that points to a JSON metadata file with your information.
-              </p>
-              
-              <h3 className="text-xl font-semibold mb-4">How to Create IPFS Metadata:</h3>
-              <ol className="list-decimal list-inside text-gray-400 space-y-3 mb-6">
-                <li>Create a JSON file with your scholarship information</li>
-                <li>Upload it to IPFS using services like <a href="https://pinata.cloud" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Pinata</a> or <a href="https://nft.storage" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">NFT.Storage</a></li>
-                <li>Copy the resulting IPFS hash (CID)</li>
-                <li>Use this hash when creating your scholarship</li>
-              </ol>
-              
-              <div>
-                <button 
-                  onClick={toggleSampleMetadata}
-                  className="text-blue-400 hover:text-blue-300 flex items-center mb-4"
-                >
-                  {showSampleMetadata ? 'Hide' : 'Show'} Sample Metadata
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className={`h-4 w-4 ml-1 transition-transform ${showSampleMetadata ? 'rotate-180' : ''}`} 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                
-                {showSampleMetadata && (
-                  <div className="bg-gray-900 p-4 sm:p-6 rounded-md">
-                    <h4 className="font-semibold mb-3">Sample Metadata Format:</h4>
-                    <pre className="text-xs sm:text-sm text-gray-300 overflow-x-auto">
-{`{
-  "name": "John Doe Scholarship",
-  "description": "Computer Science student seeking funding for tuition",
-  "image": "ipfs://QmSampleImageHash",
-  "attributes": [
-    { "trait_type": "Field of Study", "value": "Computer Science" },
-    { "trait_type": "Degree", "value": "Bachelor's" },
-    { "trait_type": "Year", "value": "2" },
-    { "trait_type": "University", "value": "Example University" }
-  ],
-  "contact": {
-    "email": "john.doe@example.com",
-    "twitter": "@johndoe"
-  }
-}`}
-                    </pre>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </section>
