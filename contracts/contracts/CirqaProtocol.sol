@@ -23,11 +23,18 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
 
     // Reward rate for investors (in Cirqa tokens per 1 USDT)
     uint256 public rewardRate = 1e18; // 1 Cirqa token per 1 USDT
+    uint256 public protocolFee = 100; // 1% (100 basis points) for 1e4 basis points total (10000)
+
+    struct WithdrawalRecord {
+        uint256 amount;
+        uint256 timestamp;
+    }
 
     struct ScholarshipData {
         address student;
         uint256 balance;
         string metadata; // IPFS hash containing student data (photos, documents, etc.)
+        WithdrawalRecord[] withdrawalHistory;
     }
 
     mapping(uint256 => ScholarshipData) public scholarships;
@@ -62,7 +69,8 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
         scholarships[newTokenId] = ScholarshipData({
             student: msg.sender,
             balance: 0,
-            metadata: metadata
+            metadata: metadata,
+            withdrawalHistory: new WithdrawalRecord[](0)
         });
 
         emit ScholarshipCreated(newTokenId, msg.sender, metadata);
@@ -102,9 +110,17 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
         require(amount <= scholarships[tokenId].balance, "Insufficient balance");
 
         scholarships[tokenId].balance -= amount;
-        require(usdtToken.transfer(msg.sender, amount), "USDT transfer failed");
+        uint256 feeAmount = (amount * protocolFee) / 10000;
+        uint256 amountToStudent = amount - feeAmount;
+        require(usdtToken.transfer(msg.sender, amountToStudent), "USDT transfer failed");
+        require(usdtToken.transfer(owner(), feeAmount), "Fee transfer failed");
 
-        emit FundsWithdrawn(tokenId, msg.sender, amount);
+        scholarships[tokenId].withdrawalHistory.push(WithdrawalRecord({
+            amount: amountToStudent,
+            timestamp: block.timestamp
+        }));
+
+        emit FundsWithdrawn(tokenId, msg.sender, amountToStudent);
     }
 
     /**
@@ -137,5 +153,14 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
 
     function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721URIStorage) returns (bool) {
         return super.supportsInterface(interfaceId);
+    }
+
+    /**
+     * @dev Updates the protocol fee for withdrawals (only owner)
+     * @param newFee New protocol fee in basis points (e.g., 100 for 1%)
+     */
+    function setProtocolFee(uint256 newFee) external onlyOwner {
+        require(newFee <= 1000, "Fee cannot exceed 10%"); // Max 10% (1000 basis points)
+        protocolFee = newFee;
     }
 }
