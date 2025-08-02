@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  /* Dark theme (default) */
   --background: #0A0A0A;
   --foreground: #EDEDED;
   --primary: #3d3939;
@@ -11,6 +12,24 @@
   --success: #10B981;
   --warning: #F59E0B;
   --info: #3B82F6;
+  --card-border: #2a2a2a;
+  --card-hover-border: #3a3a3a;
+}
+
+/* Light theme */
+.light {
+  --background: #F5F5F5;
+  --foreground: #121212;
+  --primary: #E5E5E5;
+  --primary-hover: #D4D4D4;
+  --secondary: #FFFFFF;
+  --accent: #0D9668;
+  --error: #DC2626;
+  --success: #0D9668;
+  --warning: #D97706;
+  --info: #2563EB;
+  --card-border: #E5E5E5;
+  --card-hover-border: #D4D4D4;
 }
 
 @theme inline {
@@ -77,12 +96,12 @@ body {
   background-color: var(--secondary);
   border-radius: 0.5rem;
   padding: 1rem;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--card-border);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   transition: all 0.3s ease;
 }
 
 .card:hover {
-  border-color: #3a3a3a;
+  border-color: var(--card-hover-border);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }

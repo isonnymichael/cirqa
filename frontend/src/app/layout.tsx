@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <link rel="icon" type="image/svg+xml" href="/cirqa-logo.svg" />
       </head>
