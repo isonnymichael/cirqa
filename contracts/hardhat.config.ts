@@ -5,7 +5,16 @@ import "@nomicfoundation/hardhat-toolbox";
 dotenvConfig()
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.28",
+  solidity: {
+    version: "0.8.28",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200
+      },
+      viaIR: true
+    }
+  },
   networks: {
     kiiTestnet: {
       url: "https://json-rpc.uno.sentry.testnet.v3.kiivalidator.com/",

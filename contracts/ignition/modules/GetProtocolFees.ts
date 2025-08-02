@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
 
-const PROTOCOL_ADDRESS = "0x6f6A53069f1894D44032424AdB2c173C4d745526";
+const PROTOCOL_ADDRESS = "0x3890D4c8CfEe3B7F338ff12A8b4B13d80c7201EB";
 
 // Interface for ERC20 metadata (name, symbol, decimals)
 const IERC20MetadataABI = [

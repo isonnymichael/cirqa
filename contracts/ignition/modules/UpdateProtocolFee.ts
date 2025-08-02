@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
 
-const PROTOCOL_ADDRESS = "0x6f6A53069f1894D44032424AdB2c173C4d745526";
+const PROTOCOL_ADDRESS = "0x3890D4c8CfEe3B7F338ff12A8b4B13d80c7201EB";
 const FEE_BPS = 100; // 1% in basis points (100 bps = 1%)
 
 async function main() {

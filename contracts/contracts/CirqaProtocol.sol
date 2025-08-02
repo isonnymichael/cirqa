@@ -566,8 +566,11 @@ contract CirqaProtocol is Ownable {
             collateralToSeize = borrowerCollateralInfo.supplied;
         }
         
-        // Update borrower's borrowed amount
+        // Update borrower's borrowed amount and collateral amount in one go
         _updateUser(borrowedPid, _borrower);
+        _updateUser(collateralPid, _borrower);
+        
+        // Update borrowed asset state
         uint256 oldBorrowPoints = borrowerBorrowInfo.supplied + (borrowerBorrowInfo.borrowed / 2);
         borrowerBorrowInfo.borrowed -= actualRepayAmount;
         uint256 newBorrowPoints = borrowerBorrowInfo.supplied + (borrowerBorrowInfo.borrowed / 2);
@@ -577,8 +580,7 @@ contract CirqaProtocol is Ownable {
         borrowedAsset.totalBorrowed -= actualRepayAmount;
         borrowerBorrowInfo.rewardDebt = newBorrowPoints * borrowedAsset.accCirqaPerShare / 1e12;
         
-        // Update borrower's collateral amount
-        _updateUser(collateralPid, _borrower);
+        // Update collateral asset state
         uint256 oldCollateralPoints = borrowerCollateralInfo.supplied + (borrowerCollateralInfo.borrowed / 2);
         borrowerCollateralInfo.supplied -= collateralToSeize;
         uint256 newCollateralPoints = borrowerCollateralInfo.supplied + (borrowerCollateralInfo.borrowed / 2);

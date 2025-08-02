@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 
 const { getAddress } = require("ethers");
 
-const PROTOCOL_ADDRESS = "0x6f6A53069f1894D44032424AdB2c173C4d745526";
+const PROTOCOL_ADDRESS = "0x3890D4c8CfEe3B7F338ff12A8b4B13d80c7201EB";
 const ASSETS_TO_ADD = [
     { address: "0xd51e7187e54a4a22d790f8bbddd9b54b891bc920", allocPoint: 50 }, // Wrapped KII (native)
     { address: "0x7806bbef4f5aba0bd0e96139eeeb2df88e7839e5", allocPoint: 80 }, // Wrapped BTC
