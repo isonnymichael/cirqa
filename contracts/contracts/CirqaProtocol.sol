@@ -21,10 +21,10 @@ contract CirqaProtocol is Ownable {
     // Total allocation points. Must be the sum of all allocation points in all asset infos.
     uint256 public totalAllocPoint = 0;
     // CIRQA tokens created per second.
-    uint256 public cirqaPerSecond = 158e15; // ~0.158 CIRQA/sec
+    uint256 public cirqaPerSecond = 1e12; // ~0.0864 CIRQA/sec
 
     // Protocol fee
-    uint256 public protocolFeeBps = 0; // Protocol fee in basis points. 100 bps = 1%.
+    uint256 public protocolFeeBps = 100; // Protocol fee in basis points. 100 bps = 1%.
     address public protocolFeeRecipient;
 
     struct UserInfo {
@@ -42,6 +42,9 @@ contract CirqaProtocol is Ownable {
         uint256 totalPoints; // Total points of this asset
         uint256 totalSupplied; // Total supplied amount of this asset
         uint256 totalBorrowed; // Total borrowed amount of this asset
+        uint256 collateralFactor; // Percentage of the asset's value that can be borrowed against (in basis points)
+        uint256 liquidationThreshold; // Threshold at which a position can be liquidated (in basis points)
+        uint256 liquidationBonus; // Bonus for liquidators (in basis points)
     }
 
     event Supply(address indexed user, uint256 indexed pid, uint256 amount);
@@ -51,6 +54,8 @@ contract CirqaProtocol is Ownable {
     event Claim(address indexed user, uint256 amount);
     event ProtocolFeePaid(address indexed asset, address indexed user, uint256 feeAmount);
     event CollateralStatusChanged(address indexed user, uint256 indexed pid, bool enabled);
+    event Liquidation(address indexed liquidator, address indexed borrower, uint256 indexed assetId, uint256 amount, uint256 collateralAssetId, uint256 collateralAmount);
+    event AssetConfigUpdated(uint256 indexed pid, uint256 collateralFactor, uint256 liquidationThreshold, uint256 liquidationBonus);
 
     /*
     |--------------------------------------------------------------------------
@@ -97,6 +102,28 @@ contract CirqaProtocol is Ownable {
     | Admin Functions
     |--------------------------------------------------------------------------
     */
+    
+    /**
+     * @notice Updates the collateral configuration for an asset.
+     * @param _pid The ID of the pool to update.
+     * @param _collateralFactor The percentage of the asset's value that can be borrowed against (in basis points).
+     * @param _liquidationThreshold The threshold at which a position can be liquidated (in basis points).
+     * @param _liquidationBonus The bonus for liquidators (in basis points).
+     */
+    function setAssetConfig(uint256 _pid, uint256 _collateralFactor, uint256 _liquidationThreshold, uint256 _liquidationBonus) public onlyOwner {
+        require(_pid < assetInfo.length, "Invalid pool ID");
+        require(_collateralFactor <= 9000, "Collateral factor too high"); // Max 90%
+        require(_liquidationThreshold > _collateralFactor, "Liquidation threshold must be higher than collateral factor");
+        require(_liquidationThreshold <= 9500, "Liquidation threshold too high"); // Max 95%
+        require(_liquidationBonus <= 2000, "Liquidation bonus too high"); // Max 20%
+        
+        AssetInfo storage asset = assetInfo[_pid];
+        asset.collateralFactor = _collateralFactor;
+        asset.liquidationThreshold = _liquidationThreshold;
+        asset.liquidationBonus = _liquidationBonus;
+        
+        emit AssetConfigUpdated(_pid, _collateralFactor, _liquidationThreshold, _liquidationBonus);
+    }
 
     /**
      * @notice Sets the protocol fee percentage.
@@ -146,7 +173,10 @@ contract CirqaProtocol is Ownable {
             accCirqaPerShare: 0,
             totalPoints: 0,
             totalSupplied: 0,
-            totalBorrowed: 0
+            totalBorrowed: 0,
+            collateralFactor: 7500, // Default 75%
+            liquidationThreshold: 8500, // Default 85%
+            liquidationBonus: 500 // Default 5%
         }));
         assetId[_asset] = assetInfo.length;
     }
@@ -206,6 +236,91 @@ contract CirqaProtocol is Ownable {
     | View Functions
     |--------------------------------------------------------------------------
     */
+    
+    /**
+     * @notice Calculates the available amount that can be borrowed for a specific asset.
+     * @param _pid The ID of the pool.
+     * @return The available amount that can be borrowed.
+     */
+    function getAvailableToBorrow(uint256 _pid) external view returns (uint256) {
+        AssetInfo storage asset = assetInfo[_pid];
+        return asset.totalSupplied - asset.totalBorrowed;
+    }
+    
+    /**
+     * @notice Calculates the total borrowing capacity of a user across all assets.
+     * @param _user The address of the user.
+     * @return totalCapacity The total borrowing capacity in USD.
+     */
+    function getUserBorrowingCapacity(address _user) public view returns (uint256 totalCapacity) {
+        uint256 len = assetInfo.length;
+        for (uint256 pid = 0; pid < len; ++pid) {
+            UserInfo storage user = userInfo[pid][_user];
+            if (user.useAsCollateral && user.supplied > 0) {
+                // In a real implementation, this would use price oracles to convert to USD
+                // For simplicity, we're assuming 1:1 value for all assets
+                totalCapacity += (user.supplied * assetInfo[pid].collateralFactor) / 10000;
+            }
+        }
+        return totalCapacity;
+    }
+    
+    /**
+     * @notice Calculates the total borrowed value of a user across all assets.
+     * @param _user The address of the user.
+     * @return totalBorrowed The total borrowed value in USD.
+     */
+    function getUserTotalBorrowed(address _user) public view returns (uint256 totalBorrowed) {
+        uint256 len = assetInfo.length;
+        for (uint256 pid = 0; pid < len; ++pid) {
+            // In a real implementation, this would use price oracles to convert to USD
+            // For simplicity, we're assuming 1:1 value for all assets
+            totalBorrowed += userInfo[pid][_user].borrowed;
+        }
+        return totalBorrowed;
+    }
+    
+    /**
+     * @notice Checks if a user has enough collateral to borrow a specific amount of an asset.
+     * @param _user The address of the user.
+     * @param _asset The address of the asset to borrow.
+     * @param _amount The amount of the asset to borrow.
+     * @return True if the user has enough collateral, false otherwise.
+     */
+    function hasEnoughCollateral(address _user, address _asset, uint256 _amount) public view returns (bool) {
+        uint256 borrowCapacity = getUserBorrowingCapacity(_user);
+        uint256 currentBorrowed = getUserTotalBorrowed(_user);
+        
+        // In a real implementation, this would use price oracles to convert to USD
+        // For simplicity, we're assuming 1:1 value for all assets
+        return (currentBorrowed + _amount) <= borrowCapacity;
+    }
+    
+    /**
+     * @notice Checks if a user's position is liquidatable.
+     * @param _user The address of the user.
+     * @return True if the user's position is liquidatable, false otherwise.
+     */
+    function isLiquidatable(address _user) public view returns (bool) {
+        uint256 len = assetInfo.length;
+        uint256 totalCollateralValue = 0;
+        uint256 liquidationLimit = 0;
+        
+        for (uint256 pid = 0; pid < len; ++pid) {
+            UserInfo storage user = userInfo[pid][_user];
+            if (user.useAsCollateral && user.supplied > 0) {
+                // In a real implementation, this would use price oracles to convert to USD
+                // For simplicity, we're assuming 1:1 value for all assets
+                totalCollateralValue += user.supplied;
+                liquidationLimit += (user.supplied * assetInfo[pid].liquidationThreshold) / 10000;
+            }
+        }
+        
+        if (totalCollateralValue == 0) return false;
+        
+        uint256 totalBorrowed = getUserTotalBorrowed(_user);
+        return totalBorrowed > liquidationLimit;
+    }
 
     /**
      * @notice Returns the total number of asset pools.
@@ -355,16 +470,23 @@ contract CirqaProtocol is Ownable {
         uint256 pid = assetId[_asset] - 1;
         _updateUser(pid, msg.sender);
 
+        AssetInfo storage asset = assetInfo[pid];
+        
+        // Check if there's enough liquidity in the pool
+        require(asset.totalSupplied - asset.totalBorrowed >= _amount, "Insufficient liquidity in pool");
+        
+        // Check if user has enough collateral
+        require(hasEnoughCollateral(msg.sender, _asset, _amount), "Insufficient collateral");
+
         uint256 feeAmount = _amount * protocolFeeBps / 10000;
         uint256 amountToUser = _amount - feeAmount;
 
         if (feeAmount > 0) {
-            assetInfo[pid].asset.transfer(protocolFeeRecipient, feeAmount);
+            asset.asset.transfer(protocolFeeRecipient, feeAmount);
             emit ProtocolFeePaid(_asset, msg.sender, feeAmount);
         }
 
         UserInfo storage user = userInfo[pid][msg.sender];
-        AssetInfo storage asset = assetInfo[pid];
 
         uint256 oldPoints = user.supplied + (user.borrowed / 2);
         user.borrowed += _amount;
@@ -375,7 +497,7 @@ contract CirqaProtocol is Ownable {
         user.rewardDebt = newPoints * asset.accCirqaPerShare / 1e12;
 
         if (amountToUser > 0) {
-            assetInfo[pid].asset.transfer(msg.sender, amountToUser);
+            asset.asset.transfer(msg.sender, amountToUser);
         }
         emit Borrow(msg.sender, pid, _amount);
     }
@@ -402,15 +524,73 @@ contract CirqaProtocol is Ownable {
         asset.totalBorrowed -= _amount;
         user.rewardDebt = newPoints * asset.accCirqaPerShare / 1e12;
 
-        assetInfo[pid].asset.transferFrom(msg.sender, address(this), _amount);
+        asset.asset.transferFrom(msg.sender, address(this), _amount);
         emit Repay(msg.sender, pid, _amount);
     }
-
+    
     /**
-     * @notice Claims pending CIRQA rewards for the caller from a specific pool.
-     * @param _pid The ID of the pool to claim from.
+     * @notice Liquidates an undercollateralized position.
+     * @param _borrower The address of the borrower to liquidate.
+     * @param _assetBorrowed The address of the borrowed asset to repay.
+     * @param _assetCollateral The address of the collateral asset to receive.
+     * @param _amount The amount of the borrowed asset to repay.
      */
-    function claimReward(uint256 _pid) public {
-        _updateUser(_pid, msg.sender);
+    function liquidate(address _borrower, address _assetBorrowed, address _assetCollateral, uint256 _amount) external {
+        require(_borrower != msg.sender, "Cannot liquidate yourself");
+        require(isLiquidatable(_borrower), "Borrower is not liquidatable");
+        
+        uint256 borrowedPid = assetId[_assetBorrowed] - 1;
+        uint256 collateralPid = assetId[_assetCollateral] - 1;
+        
+        UserInfo storage borrowerBorrowInfo = userInfo[borrowedPid][_borrower];
+        UserInfo storage borrowerCollateralInfo = userInfo[collateralPid][_borrower];
+        
+        require(borrowerBorrowInfo.borrowed > 0, "Borrower has no debt in this asset");
+        require(borrowerCollateralInfo.supplied > 0 && borrowerCollateralInfo.useAsCollateral, "No collateral available");
+        
+        // Limit the liquidation amount to the borrowed amount
+        uint256 actualRepayAmount = _amount;
+        if (actualRepayAmount > borrowerBorrowInfo.borrowed) {
+            actualRepayAmount = borrowerBorrowInfo.borrowed;
+        }
+        
+        // Calculate the collateral to seize
+        // In a real implementation, this would use price oracles to convert between assets
+        // For simplicity, we're assuming 1:1 value for all assets with a liquidation bonus
+        AssetInfo storage collateralAsset = assetInfo[collateralPid];
+        uint256 bonusMultiplier = 10000 + collateralAsset.liquidationBonus;
+        uint256 collateralToSeize = (actualRepayAmount * bonusMultiplier) / 10000;
+        
+        // Ensure we don't seize more than available
+        if (collateralToSeize > borrowerCollateralInfo.supplied) {
+            collateralToSeize = borrowerCollateralInfo.supplied;
+        }
+        
+        // Update borrower's borrowed amount
+        _updateUser(borrowedPid, _borrower);
+        uint256 oldBorrowPoints = borrowerBorrowInfo.supplied + (borrowerBorrowInfo.borrowed / 2);
+        borrowerBorrowInfo.borrowed -= actualRepayAmount;
+        uint256 newBorrowPoints = borrowerBorrowInfo.supplied + (borrowerBorrowInfo.borrowed / 2);
+        
+        AssetInfo storage borrowedAsset = assetInfo[borrowedPid];
+        borrowedAsset.totalPoints = borrowedAsset.totalPoints - oldBorrowPoints + newBorrowPoints;
+        borrowedAsset.totalBorrowed -= actualRepayAmount;
+        borrowerBorrowInfo.rewardDebt = newBorrowPoints * borrowedAsset.accCirqaPerShare / 1e12;
+        
+        // Update borrower's collateral amount
+        _updateUser(collateralPid, _borrower);
+        uint256 oldCollateralPoints = borrowerCollateralInfo.supplied + (borrowerCollateralInfo.borrowed / 2);
+        borrowerCollateralInfo.supplied -= collateralToSeize;
+        uint256 newCollateralPoints = borrowerCollateralInfo.supplied + (borrowerCollateralInfo.borrowed / 2);
+        
+        collateralAsset.totalPoints = collateralAsset.totalPoints - oldCollateralPoints + newCollateralPoints;
+        collateralAsset.totalSupplied -= collateralToSeize;
+        borrowerCollateralInfo.rewardDebt = newCollateralPoints * collateralAsset.accCirqaPerShare / 1e12;
+        
+        // Transfer assets
+        borrowedAsset.asset.transferFrom(msg.sender, address(this), actualRepayAmount);
+        collateralAsset.asset.transfer(msg.sender, collateralToSeize);
+        
+        emit Liquidation(msg.sender, _borrower, borrowedPid, actualRepayAmount, collateralPid, collateralToSeize);
     }
 }
