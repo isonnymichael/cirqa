@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useSendTransaction } from 'thirdweb/react';
-import { prepareContractCall } from 'thirdweb';
+import { useSendTransaction, useActiveAccount } from 'thirdweb/react';
+import { prepareContractCall, readContract } from 'thirdweb';
 import { cirqaProtocolContract } from '@/lib/contracts';
 import { parseUnits, formatUnits } from 'ethers';
 import Image from 'next/image';
@@ -19,6 +19,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, asset, o
   const [amount, setAmount] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const { mutate: sendTransaction } = useSendTransaction();
+  const account = useActiveAccount();
   const modalRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   
@@ -47,7 +48,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, asset, o
   }, [isOpen, onClose]);
 
   const handleWithdraw = async () => {
-    if (!asset || !amount) return;
+    if (!asset || !amount || !account) return;
 
     const amountBN = parseUnits(amount, asset.decimals);
 
@@ -61,12 +62,31 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, asset, o
 
       await new Promise((resolve, reject) => {
         sendTransaction(transaction, {
-          onSuccess: (receipt) => {
-            showToast(
-              "Withdraw transaction confirmed!",
-              `https://kiichain.explorer/tx/${receipt.transactionHash}`,
-              "View Receipt"
-            );
+          onSuccess: async (receipt) => {
+            // Get pending CIRQA rewards
+            try {
+              const assetId = asset.assetId || 0;
+              const pendingRewards = await readContract({
+                contract: cirqaProtocolContract,
+                method: 'function pendingCirqa(uint256,address) view returns (uint256)',
+                params: [assetId, account?.address],
+              });
+              
+              const formattedRewards = formatUnits(pendingRewards || 0, 18);
+              showToast(
+                `Withdraw transaction confirmed! You earned ${parseFloat(formattedRewards).toFixed(6)} CIRQA rewards!`,
+                `https://kiichain.explorer/tx/${receipt.transactionHash}`,
+                "View Receipt"
+              );
+            } catch (error) {
+              console.error('Failed to fetch rewards', error);
+              showToast(
+                "Withdraw transaction confirmed!",
+                `https://kiichain.explorer/tx/${receipt.transactionHash}`,
+                "View Receipt"
+              );
+            }
+            
             setTimeout(() => {
               onSuccess();
               onClose();

@@ -96,12 +96,31 @@ const SupplyModal: React.FC<SupplyModalProps> = ({ isOpen, onClose, asset, onSuc
       });
       await new Promise((resolve, reject) => {
         sendTransaction(supplyTransaction, {
-          onSuccess: (receipt) => {
-            showToast(
-              "Supply transaction confirmed!",
-              `https://kiichain.explorer/tx/${receipt.transactionHash}`,
-              "View Receipt"
-            );
+          onSuccess: async (receipt) => {
+            // Get pending CIRQA rewards
+            try {
+              const assetId = asset.assetId || 0;
+              const pendingRewards = await readContract({
+                contract: cirqaProtocolContract,
+                method: 'function pendingCirqa(uint256,address) view returns (uint256)',
+                params: [assetId, account?.address],
+              });
+              
+              const formattedRewards = formatUnits(pendingRewards || 0, 18);
+              showToast(
+                `Supply transaction confirmed! You earned ${parseFloat(formattedRewards).toFixed(6)} CIRQA rewards!`,
+                `https://kiichain.explorer/tx/${receipt.transactionHash}`,
+                "View Receipt"
+              );
+            } catch (error) {
+              console.error('Failed to fetch rewards', error);
+              showToast(
+                "Supply transaction confirmed!",
+                `https://kiichain.explorer/tx/${receipt.transactionHash}`,
+                "View Receipt"
+              );
+            }
+            
             setTimeout(() => {
               onSuccess();
               onClose();
