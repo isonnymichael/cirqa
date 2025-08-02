@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -11,7 +11,7 @@ contract CirqaToken is ERC20, ERC20Burnable, Ownable {
 
     event MinterChanged(address indexed newMinter);
 
-    constructor() ERC20("Cirqa Token", "CIRQA") Ownable(msg.sender) {}
+    constructor() ERC20("Cirqa Token", "CIRQA") Ownable() {}
 
     function setMinter(address _minter) public onlyOwner {
         minter = _minter;
