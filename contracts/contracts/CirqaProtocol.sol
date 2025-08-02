@@ -258,7 +258,7 @@ contract CirqaProtocol is Ownable {
             UserInfo storage user = userInfo[pid][_user];
             if (user.useAsCollateral && user.supplied > 0) {
                 // In a real implementation, this would use price oracles to convert to USD
-                // For simplicity, we're assuming 1:1 value for all assets
+                // TODO: For simplicity, we're assuming 1:1 value for all assets
                 totalCapacity += (user.supplied * assetInfo[pid].collateralFactor) / 10000;
             }
         }
@@ -274,7 +274,7 @@ contract CirqaProtocol is Ownable {
         uint256 len = assetInfo.length;
         for (uint256 pid = 0; pid < len; ++pid) {
             // In a real implementation, this would use price oracles to convert to USD
-            // For simplicity, we're assuming 1:1 value for all assets
+            // TODO: For simplicity, we're assuming 1:1 value for all assets
             totalBorrowed += userInfo[pid][_user].borrowed;
         }
         return totalBorrowed;
@@ -292,7 +292,7 @@ contract CirqaProtocol is Ownable {
         uint256 currentBorrowed = getUserTotalBorrowed(_user);
         
         // In a real implementation, this would use price oracles to convert to USD
-        // For simplicity, we're assuming 1:1 value for all assets
+        // TODO: For simplicity, we're assuming 1:1 value for all assets
         return (currentBorrowed + _amount) <= borrowCapacity;
     }
     
@@ -310,7 +310,7 @@ contract CirqaProtocol is Ownable {
             UserInfo storage user = userInfo[pid][_user];
             if (user.useAsCollateral && user.supplied > 0) {
                 // In a real implementation, this would use price oracles to convert to USD
-                // For simplicity, we're assuming 1:1 value for all assets
+                // TODO: For simplicity, we're assuming 1:1 value for all assets
                 totalCollateralValue += user.supplied;
                 liquidationLimit += (user.supplied * assetInfo[pid].liquidationThreshold) / 10000;
             }
@@ -556,7 +556,7 @@ contract CirqaProtocol is Ownable {
         
         // Calculate the collateral to seize
         // In a real implementation, this would use price oracles to convert between assets
-        // For simplicity, we're assuming 1:1 value for all assets with a liquidation bonus
+        // TODO: For simplicity, we're assuming 1:1 value for all assets with a liquidation bonus
         AssetInfo storage collateralAsset = assetInfo[collateralPid];
         uint256 bonusMultiplier = 10000 + collateralAsset.liquidationBonus;
         uint256 collateralToSeize = (actualRepayAmount * bonusMultiplier) / 10000;
