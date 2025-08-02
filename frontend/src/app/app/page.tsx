@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import CreateScholarshipModal from '@/components/app/CreateScholarshipModal';
+import React from 'react';
+import Link from 'next/link';
 import ScholarshipList from '@/components/app/ScholarshipList';
 import ScholarshipStats from '@/components/app/ScholarshipStats';
 import NotificationBanner from '@/components/app/NotificationBanner';
@@ -9,23 +9,6 @@ import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react';
 import { kiiTestnet } from '@/lib/chain';
 
 export default function AppPage() {
-  const [activeTab, setActiveTab] = useState('scholarship');
-  const [isCreateScholarshipModalOpen, setIsCreateScholarshipModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const handleScholarshipCreated = () => {
-    setIsCreateScholarshipModalOpen(false);
-    // Optionally, refresh the scholarship list here if needed
-  };
-
-  const handleOpenCreateScholarshipModal = () => {
-    setIsCreateScholarshipModalOpen(true);
-  };
-
-  const handleCloseCreateScholarshipModal = () => {
-    setIsCreateScholarshipModalOpen(false);
-  };
-  
   const account = useActiveAccount();
   const chain = useActiveWalletChain();
 
@@ -60,13 +43,16 @@ export default function AppPage() {
         {/* Scholarship Sections */}
         <div className="mt-8">
           <div className="mt-8">
-            <div className="flex justify-end mb-4">
-              <button
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                onClick={handleOpenCreateScholarshipModal}
+            <div className="flex justify-between mb-4">
+              <h2 className="text-2xl font-bold mb-4">Scholarships</h2>
+
+              <Link 
+                href="/app/metadata" 
+                className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-3 rounded"
               >
-                Create New Scholarship
-              </button>
+                <span className="hidden md:inline">Create New Scholarship</span>
+                <span className="inline md:hidden">Create New</span>
+              </Link>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
               <ScholarshipList />
@@ -74,12 +60,6 @@ export default function AppPage() {
           </div>
 
         </div>
-
-        <CreateScholarshipModal
-          isOpen={isCreateScholarshipModalOpen}
-          onClose={handleCloseCreateScholarshipModal}
-          onScholarshipCreated={handleScholarshipCreated}
-        />
       </div>
     </main>
   );

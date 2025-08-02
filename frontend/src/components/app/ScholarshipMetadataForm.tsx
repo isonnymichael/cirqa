@@ -80,8 +80,6 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
 
   return (
     <div className={`bg-gray-800 rounded-lg p-6 border border-gray-700 ${className}`}>
-      <h3 className="text-lg font-semibold mb-4">Scholarship Metadata Generator</h3>
-      
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">Scholarship Name</label>

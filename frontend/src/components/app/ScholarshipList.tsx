@@ -19,7 +19,7 @@ type Scholarship = {
 
 const ScholarshipList: React.FC = () => {
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null);
   const [isFundModalOpen, setIsFundModalOpen] = useState(false);
@@ -32,54 +32,84 @@ const ScholarshipList: React.FC = () => {
   });
   
   const account = useActiveAccount();
-
-  // Function to fetch a single scholarship by ID
-  const fetchScholarship = async (id: number): Promise<Scholarship | null> => {
-    try {
-      const result = await cirqaProtocolContract.read.scholarships([id]);
-      if (result && result.exists) {
-        return {
-          id,
-          student: result.student,
-          balance: result.balance,
-          metadata: result.metadata,
-          exists: result.exists
-        };
-      }
-      return null;
-    } catch (err) {
-      console.error(`Error fetching scholarship ${id}:`, err);
-      return null;
-    }
+  
+  // Determine total number of scholarships by finding the highest valid ID
+  const [totalScholarships, setTotalScholarships] = useState<number>(0);
+  const [isTotalScholarshipsLoading, setIsTotalScholarshipsLoading] = useState<boolean>(true);
+  
+  // Use useReadContract to fetch scholarships
+  const fetchScholarshipData = (id: number) => {
+    return useReadContract({
+      contract: cirqaProtocolContract,
+      method: 'scholarships',
+      params: [id],
+    });
   };
+  
+  // Create an array of scholarship IDs to fetch (1 to 20)
+  const scholarshipIds = useMemo(() => {
+    return Array.from({ length: 20 }, (_, i) => i + 1);
+  }, []);
+  
+  // Fetch scholarship data for each ID
+  const scholarshipDataResults = scholarshipIds.map(id => fetchScholarshipData(id));
+  
+  // Process scholarship data when available
+  // useEffect(() => {
+  //   if (account && scholarshipDataResults.every(result => !result.isLoading)) {
+  //     const validScholarships: Scholarship[] = [];
+      
+  //     scholarshipDataResults.forEach((result, index) => {
+  //       if (result.data && result.data.student !== '0x0000000000000000000000000000000000000000') {
+  //         validScholarships.push({
+  //           id: scholarshipIds[index],
+  //           student: result.data.student,
+  //           balance: result.data.balance,
+  //           metadata: result.data.metadata,
+  //           exists: true
+  //         });
+  //       }
+  //     });
+      
+  //     setScholarships(validScholarships);
+  //     setLoading(false);
+  //   }
+  // }, [account, scholarshipDataResults, scholarshipIds]);
+  
+  // Find the highest valid scholarship ID to determine total count
+  // useEffect(() => {
+  //   const findHighestScholarshipId = async () => {
+  //     if (!account) return;
+      
+  //     setIsTotalScholarshipsLoading(true);
+  //     try {
+  //       let maxId = 0;
+  //       const MAX_ID_TO_CHECK = 100; // Limit our search to avoid excessive calls
+        
+  //       for (let i = 1; i <= MAX_ID_TO_CHECK; i++) {
+  //         try {
+  //           // Check if the token exists by trying to get its owner
+  //           const owner = await cirqaProtocolContract.read.ownerOf([i]);
+  //           if (owner && owner !== '0x0000000000000000000000000000000000000000') {
+  //             maxId = i;
+  //           }
+  //         } catch (err) {
+  //           // If ownerOf throws an error, the token doesn't exist
+  //           break;
+  //         }
+  //       }
+        
+  //       setTotalScholarships(maxId);
+  //     } catch (err) {
+  //       console.error('Error finding highest scholarship ID:', err);
+  //     } finally {
+  //       setIsTotalScholarshipsLoading(false);
+  //     }
+  //   };
+    
+  //   findHighestScholarshipId();
+  // }, [account]);
 
-  // Function to fetch all scholarships
-  const fetchScholarships = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // We'll try to fetch scholarships with IDs from 1 to 20 (adjust as needed)
-      const scholarshipPromises = [];
-      for (let i = 1; i <= 20; i++) {
-        scholarshipPromises.push(fetchScholarship(i));
-      }
-
-      const results = await Promise.all(scholarshipPromises);
-      const validScholarships = results.filter(s => s !== null) as Scholarship[];
-      setScholarships(validScholarships);
-    } catch (err: any) {
-      console.error('Error fetching scholarships:', err);
-      setError(err.message || 'Failed to load scholarships');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (account) {
-      fetchScholarships();
-    }
-  }, [account]);
 
   const handleFundClick = (scholarship: Scholarship) => {
     setSelectedScholarship(scholarship);
@@ -93,12 +123,16 @@ const ScholarshipList: React.FC = () => {
 
   const handleFundComplete = () => {
     setIsFundModalOpen(false);
-    fetchScholarships(); // Refresh the list
+    // Force a refresh by setting loading to true
+    setLoading(true);
+    // The data will be refreshed automatically by the useReadContract hooks
   };
 
   const handleWithdrawComplete = () => {
     setIsWithdrawModalOpen(false);
-    fetchScholarships(); // Refresh the list
+    // Force a refresh by setting loading to true
+    setLoading(true);
+    // The data will be refreshed automatically by the useReadContract hooks
   };
 
   if (loading) {
@@ -114,7 +148,7 @@ const ScholarshipList: React.FC = () => {
       <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-center">
         <p className="text-red-500">{error}</p>
         <button 
-          onClick={fetchScholarships}
+          onClick={()=>{}} //{fetchScholarships}
           className="mt-2 px-4 py-2 bg-red-700 text-white rounded-md hover:bg-red-800 transition-colors"
         >
           Try Again
@@ -205,7 +239,7 @@ const ScholarshipList: React.FC = () => {
                   <button
                     onClick={() => handleWithdrawClick(scholarship)}
                     className="flex-1 px-3 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-800 transition-colors text-sm"
-                    disabled={scholarship.balance <= 0n}
+                    disabled={scholarship.balance <= BigInt(0)}
                   >
                     Withdraw
                   </button>
