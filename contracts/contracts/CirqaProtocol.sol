@@ -66,12 +66,9 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
         _safeMint(msg.sender, newTokenId);
         _setTokenURI(newTokenId, metadata);
 
-        scholarships[newTokenId] = ScholarshipData({
-            student: msg.sender,
-            balance: 0,
-            metadata: metadata,
-            withdrawalHistory: new WithdrawalRecord[](0)
-        });
+        scholarships[newTokenId].student = msg.sender;
+        scholarships[newTokenId].balance = 0;
+        scholarships[newTokenId].metadata = metadata;
 
         emit ScholarshipCreated(newTokenId, msg.sender, metadata);
         return newTokenId;
@@ -121,6 +118,24 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
         }));
 
         emit FundsWithdrawn(tokenId, msg.sender, amountToStudent);
+    }
+
+    /**
+     * @dev Returns the withdrawal history for a given scholarship.
+     * @param tokenId The ID of the scholarship NFT.
+     * @return amounts An array of withdrawn amounts.
+     * @return timestamps An array of withdrawal timestamps.
+     */
+    function getWithdrawalHistory(uint256 tokenId) external view returns (uint256[] memory amounts, uint256[] memory timestamps) {
+        require(_exists(tokenId), "Scholarship does not exist");
+        uint256 historyLength = scholarships[tokenId].withdrawalHistory.length;
+        amounts = new uint256[](historyLength);
+        timestamps = new uint256[](historyLength);
+
+        for (uint256 i = 0; i < historyLength; i++) {
+            amounts[i] = scholarships[tokenId].withdrawalHistory[i].amount;
+            timestamps[i] = scholarships[tokenId].withdrawalHistory[i].timestamp;
+        }
     }
 
     /**
