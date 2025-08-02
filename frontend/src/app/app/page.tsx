@@ -5,17 +5,11 @@ import CreateScholarshipModal from '@/components/app/CreateScholarshipModal';
 import ScholarshipList from '@/components/app/ScholarshipList';
 import ScholarshipStats from '@/components/app/ScholarshipStats';
 import TokenInfo from '@/components/app/TokenInfo';
-import ContractInfo from '@/components/app/ContractInfo';
-import HowItWorks from '@/components/app/HowItWorks';
-import IPFSHelper from '@/components/app/IPFSHelper';
-import FAQ from '@/components/app/FAQ';
 import NotificationBanner from '@/components/app/NotificationBanner';
 import NetworkSwitcher from '@/components/app/NetworkSwitcher';
 import LoadingScreen from '@/components/app/LoadingScreen';
-import { useActiveAccount, useActiveWalletChain, useReadContract } from 'thirdweb/react';
+import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react';
 import { kiiTestnet } from '@/lib/chain';
-import { cirqaTokenContract, cirqaProtocolContract } from '@/lib/contracts';
-import { formatUnits } from 'ethers';
 
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState('scholarship');
@@ -91,41 +85,21 @@ export default function AppPage() {
           <ScholarshipStats />
         </div>
         
-        {/* Scholarship Tabs */}
+        {/* Scholarship Sections */}
         <div className="mt-8">
-          <div className="flex border-b border-gray-800 mb-6">
-            <button
-              className={`py-2 px-4 font-medium cursor-pointer ${activeTab === 'scholarship' ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}
-              onClick={() => setActiveTab('scholarship')}
-            >
-              Scholarships
-            </button>
-            {/* Removed refresh button and added auto-refresh when switching tabs */}
-          </div>
-          
-          {activeTab === 'scholarship' && (
-            <div className="mt-8">
-              <div className="flex justify-end mb-4">
-                <button
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                  onClick={handleOpenCreateScholarshipModal}
-                >
-                  Create New Scholarship
-                </button>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-3">
-                  <ScholarshipList />
-                </div>
-                <div className="lg:col-span-1 space-y-6">
-                  <HowItWorks />
-                  <IPFSHelper />
-                  <FAQ />
-                  <ContractInfo />
-                </div>
-              </div>
+          <div className="mt-8">
+            <div className="flex justify-end mb-4">
+              <button
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                onClick={handleOpenCreateScholarshipModal}
+              >
+                Create New Scholarship
+              </button>
             </div>
-          )}
+            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+              <ScholarshipList />
+            </div>
+          </div>
 
         </div>
 

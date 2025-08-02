@@ -172,7 +172,7 @@ const ScholarshipList: React.FC = () => {
         <ScholarshipFilter onFilterChange={handleFilterChange} />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="">
         {filteredScholarships.map((scholarship) => {
           const isOwner = account?.address.toLowerCase() === scholarship.student.toLowerCase();
           
