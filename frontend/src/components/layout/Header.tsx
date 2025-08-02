@@ -8,7 +8,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { kiiTestnet } from '@/lib/chain';
-import ThemeToggle from '@/components/app/ThemeToggle';
 
 const client = createThirdwebClient({
     clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID!,
@@ -44,26 +43,8 @@ const Header = () => {
               <span className="text-white font-bold text-xl ml-1">Cirqa</span>
             </div>
           </Link>
-          
-          {isAppPage && (
-            <nav className="hidden md:flex ml-6 space-x-4">
-              <Link 
-                href="/app" 
-                className={`text-sm px-3 py-2 rounded-md transition-colors ${pathname === '/app' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}
-              >
-                Dashboard
-              </Link>
-              <Link 
-                href="/app/metadata" 
-                className={`text-sm px-3 py-2 rounded-md transition-colors ${pathname === '/app/metadata' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}
-              >
-                Metadata Generator
-              </Link>
-            </nav>
-          )}
         </div>
         <div className="flex items-center space-x-4">
-          <ThemeToggle />
           
           {isAppPage ? (
             <ConnectButton 

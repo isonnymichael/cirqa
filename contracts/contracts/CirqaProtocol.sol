@@ -19,7 +19,7 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
 
     ICirqaToken public cirqaToken;
     IERC20 public usdtToken;
-    Counters.Counter private _tokenIds;
+    Counters.Counter public _tokenIds;
 
     // Reward rate for investors (in Cirqa tokens per 1 USDT)
     uint256 public rewardRate = 1e18; // 1 Cirqa token per 1 USDT
