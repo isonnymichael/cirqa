@@ -4,3 +4,9 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[[redirects]]
+  from = "/docs"
+  to = "https://cirqa.gitbook.io/cirqa-docs"
+  status = 301
+  force = true
