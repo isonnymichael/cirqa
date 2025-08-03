@@ -7,42 +7,35 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-import "./ICirqaToken.sol";
+import "./interfaces/ICirqaToken.sol";
+import "./interfaces/IScholarshipManager.sol";
+import "./interfaces/IScoreManager.sol";
 
 /**
- * @title CirqaProtocol
- * @dev A scholarship system where students can mint NFTs with their data and receive USDT funding from investors.
- * Investors are rewarded with Cirqa tokens for their contributions.
+ * @title Core
+ * @dev Core contract for the Cirqa Protocol that manages the scholarship system
+ * and coordinates between different modules.
  */
-contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
+contract Core is ERC721, ERC721URIStorage, Ownable {
     using Counters for Counters.Counter;
 
     ICirqaToken public cirqaToken;
     IERC20 public usdtToken;
     Counters.Counter public _tokenIds;
+    
+    IScholarshipManager public scholarshipManager;
+    IScoreManager public scoreManager;
 
     // Reward rate for investors (in Cirqa tokens per 1 USDT)
     uint256 public rewardRate = 1e18; // 1 Cirqa token per 1 USDT
     uint256 public protocolFee = 100; // 1% (100 basis points) for 1e4 basis points total (10000)
 
-    struct WithdrawalRecord {
-        uint256 amount;
-        uint256 timestamp;
-    }
-
-    struct ScholarshipData {
-        address student;
-        uint256 balance;
-        string metadata; // IPFS hash containing student data (photos, documents, etc.)
-        WithdrawalRecord[] withdrawalHistory;
-    }
-
-    mapping(uint256 => ScholarshipData) public scholarships;
-
     event ScholarshipCreated(uint256 indexed tokenId, address indexed student, string metadata);
     event ScholarshipFunded(uint256 indexed tokenId, address indexed investor, uint256 amount);
     event FundsWithdrawn(uint256 indexed tokenId, address indexed student, uint256 amount);
     event USDTContractUpdated(address indexed oldContract, address indexed newContract);
+    event ScholarshipManagerUpdated(address indexed oldManager, address indexed newManager);
+    event ScoreManagerUpdated(address indexed oldManager, address indexed newManager);
 
     /**
      * @dev Constructor initializes the NFT collection name and symbol, and sets initial token addresses
@@ -52,6 +45,26 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
     constructor(address _cirqaToken, address _usdtToken) ERC721("Cirqa Scholarship", "CIRQASCHOLAR") {
         cirqaToken = ICirqaToken(_cirqaToken);
         usdtToken = IERC20(_usdtToken);
+    }
+
+    /**
+     * @dev Sets the scholarship manager contract
+     * @param _scholarshipManager Address of the scholarship manager contract
+     */
+    function setScholarshipManager(address _scholarshipManager) external onlyOwner {
+        address oldManager = address(scholarshipManager);
+        scholarshipManager = IScholarshipManager(_scholarshipManager);
+        emit ScholarshipManagerUpdated(oldManager, _scholarshipManager);
+    }
+
+    /**
+     * @dev Sets the score manager contract
+     * @param _scoreManager Address of the score manager contract
+     */
+    function setScoreManager(address _scoreManager) external onlyOwner {
+        address oldManager = address(scoreManager);
+        scoreManager = IScoreManager(_scoreManager);
+        emit ScoreManagerUpdated(oldManager, _scoreManager);
     }
 
     /**
@@ -66,9 +79,8 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
         _safeMint(msg.sender, newTokenId);
         _setTokenURI(newTokenId, metadata);
 
-        scholarships[newTokenId].student = msg.sender;
-        scholarships[newTokenId].balance = 0;
-        scholarships[newTokenId].metadata = metadata;
+        scholarshipManager.initializeScholarship(newTokenId, msg.sender, metadata);
+        scoreManager.initializeScore(newTokenId);
 
         emit ScholarshipCreated(newTokenId, msg.sender, metadata);
         return newTokenId;
@@ -87,7 +99,7 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
         require(usdtToken.transferFrom(msg.sender, address(this), amount), "USDT transfer failed");
 
         // Update scholarship balance
-        scholarships[tokenId].balance += amount;
+        scholarshipManager.addFunds(tokenId, amount);
 
         // Calculate and transfer Cirqa rewards to investor
         uint256 rewardAmount = (amount * rewardRate) / 1e18;
@@ -103,39 +115,20 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
      */
     function withdrawFunds(uint256 tokenId, uint256 amount) external {
         require(_exists(tokenId), "Scholarship does not exist");
-        require(msg.sender == scholarships[tokenId].student, "Only student can withdraw");
-        require(amount <= scholarships[tokenId].balance, "Insufficient balance");
+        require(scholarshipManager.isStudent(tokenId, msg.sender), "Only student can withdraw");
+        require(scholarshipManager.hasEnoughBalance(tokenId, amount), "Insufficient balance");
 
-        scholarships[tokenId].balance -= amount;
         uint256 feeAmount = (amount * protocolFee) / 10000;
         uint256 amountToStudent = amount - feeAmount;
+        
+        scholarshipManager.withdrawFunds(tokenId, amount);
+        
         require(usdtToken.transfer(msg.sender, amountToStudent), "USDT transfer failed");
         require(usdtToken.transfer(owner(), feeAmount), "Fee transfer failed");
 
-        scholarships[tokenId].withdrawalHistory.push(WithdrawalRecord({
-            amount: amountToStudent,
-            timestamp: block.timestamp
-        }));
+        scholarshipManager.recordWithdrawal(tokenId, amountToStudent);
 
         emit FundsWithdrawn(tokenId, msg.sender, amountToStudent);
-    }
-
-    /**
-     * @dev Returns the withdrawal history for a given scholarship.
-     * @param tokenId The ID of the scholarship NFT.
-     * @return amounts An array of withdrawn amounts.
-     * @return timestamps An array of withdrawal timestamps.
-     */
-    function getWithdrawalHistory(uint256 tokenId) external view returns (uint256[] memory amounts, uint256[] memory timestamps) {
-        require(_exists(tokenId), "Scholarship does not exist");
-        uint256 historyLength = scholarships[tokenId].withdrawalHistory.length;
-        amounts = new uint256[](historyLength);
-        timestamps = new uint256[](historyLength);
-
-        for (uint256 i = 0; i < historyLength; i++) {
-            amounts[i] = scholarships[tokenId].withdrawalHistory[i].amount;
-            timestamps[i] = scholarships[tokenId].withdrawalHistory[i].timestamp;
-        }
     }
 
     /**
@@ -157,6 +150,15 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
         rewardRate = newRate;
     }
 
+    /**
+     * @dev Updates the protocol fee for withdrawals (only owner)
+     * @param newFee New protocol fee in basis points (e.g., 100 for 1%)
+     */
+    function setProtocolFee(uint256 newFee) external onlyOwner {
+        require(newFee <= 1000, "Fee cannot exceed 10%"); // Max 10% (1000 basis points)
+        protocolFee = newFee;
+    }
+
     // Override required functions
     function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
         super._burn(tokenId);
@@ -168,14 +170,5 @@ contract CirqaProtocol is ERC721, ERC721URIStorage, Ownable {
 
     function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721URIStorage) returns (bool) {
         return super.supportsInterface(interfaceId);
-    }
-
-    /**
-     * @dev Updates the protocol fee for withdrawals (only owner)
-     * @param newFee New protocol fee in basis points (e.g., 100 for 1%)
-     */
-    function setProtocolFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 1000, "Fee cannot exceed 10%"); // Max 10% (1000 basis points)
-        protocolFee = newFee;
     }
 }
