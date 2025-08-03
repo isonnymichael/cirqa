@@ -1,4 +1,5 @@
 // Utility functions for formatting, validation, and error handling
+import { MaxUint256 } from 'ethers';
 
 /**
  * Format address for display (0x1234...5678)
@@ -55,6 +56,195 @@ export function formatPercentage(basisPoints: bigint): string {
  */
 export function isValidAddress(address: string): boolean {
     return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
+
+/**
+ * Convert IPFS URI to HTTP gateway URL
+ */
+export function convertIpfsToHttp(uri: string): string {
+    if (uri.startsWith('ipfs://')) {
+        // Extract CID from ipfs://CID or ipfs://CID/path
+        const ipfsPath = uri.replace('ipfs://', '');
+        return `https://ipfs.io/ipfs/${ipfsPath}`;
+    }
+    return uri;
+}
+
+/**
+ * Parsed metadata structure
+ */
+export type ParsedMetadata = {
+    name: string;
+    image: string;
+    description: string;
+    attributes: Array<{ trait_type: string; value: string }>;
+    contact: {
+        email: string;
+        twitter: string;
+    };
+    documents: Array<{ name: string; url: string; type: string }>;
+    ipfsUrl?: string; // For async IPFS fetching
+};
+
+/**
+ * Parse metadata string to extract structured data
+ */
+export function parseMetadata(metadataString: string): ParsedMetadata {
+    try {
+        // Try to parse as JSON first
+        const parsed = JSON.parse(metadataString);
+        let imageUrl = parsed.image || parsed.photo || parsed.picture || '';
+        
+        // Convert IPFS image URLs to HTTP gateway
+        if (imageUrl) {
+            imageUrl = convertIpfsToHttp(imageUrl);
+        }
+        
+        return {
+            name: parsed.name || parsed.title || 'Scholarship',
+            image: imageUrl,
+            description: parsed.description || parsed.desc || '',
+            attributes: parsed.attributes || [],
+            contact: {
+                email: parsed.contact?.email || '',
+                twitter: parsed.contact?.twitter || ''
+            },
+            documents: (parsed.documents || []).map((doc: any) => ({
+                name: doc.name || '',
+                url: convertIpfsToHttp(doc.url || ''),
+                type: doc.type || 'Document'
+            }))
+        };
+    } catch {
+        // If not JSON, treat as IPFS URL or simple string
+        if (metadataString.startsWith('ipfs://')) {
+            // This is an IPFS URI pointing to metadata, fetch it
+            const httpUrl = convertIpfsToHttp(metadataString);
+            console.log('IPFS metadata URL converted to:', httpUrl);
+            
+            // Return placeholder - caller should handle async fetching
+            return {
+                name: 'Loading from IPFS...',
+                image: '',
+                description: 'Fetching metadata from IPFS...',
+                attributes: [],
+                contact: { email: '', twitter: '' },
+                documents: [],
+                ipfsUrl: httpUrl // Store for async fetching
+            };
+        } else if (metadataString.startsWith('http')) {
+            return {
+                name: 'Scholarship',
+                image: metadataString,
+                description: '',
+                attributes: [],
+                contact: { email: '', twitter: '' },
+                documents: []
+            };
+        }
+        // Fallback for plain text
+        return {
+            name: metadataString.slice(0, 50) || 'Scholarship',
+            image: '',
+            description: metadataString,
+            attributes: [],
+            contact: { email: '', twitter: '' },
+            documents: []
+        };
+    }
+}
+
+/**
+ * Fetch IPFS metadata from HTTP gateway
+ */
+export async function fetchIpfsMetadata(ipfsUrl: string, scholarshipId: number): Promise<ParsedMetadata> {
+    try {
+        console.log('Fetching IPFS metadata from:', ipfsUrl);
+        const response = await fetch(ipfsUrl);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const metadataJson = await response.json();
+        console.log('IPFS metadata fetched:', metadataJson);
+        
+        let imageUrl = metadataJson.image || metadataJson.photo || metadataJson.picture || '';
+        
+        // Convert IPFS image URLs to HTTP gateway
+        if (imageUrl) {
+            imageUrl = convertIpfsToHttp(imageUrl);
+        }
+        
+        return {
+            name: metadataJson.name || metadataJson.title || `Scholarship #${scholarshipId}`,
+            image: imageUrl,
+            description: metadataJson.description || metadataJson.desc || '',
+            attributes: metadataJson.attributes || [],
+            contact: {
+                email: metadataJson.contact?.email || '',
+                twitter: metadataJson.contact?.twitter || ''
+            },
+            documents: (metadataJson.documents || []).map((doc: any) => ({
+                name: doc.name || '',
+                url: convertIpfsToHttp(doc.url || ''),
+                type: doc.type || 'Document'
+            }))
+        };
+    } catch (error) {
+        console.error('Error fetching IPFS metadata:', error);
+        
+        return {
+            name: `Scholarship #${scholarshipId}`,
+            image: '',
+            description: 'Failed to load metadata from IPFS',
+            attributes: [],
+            contact: { email: '', twitter: '' },
+            documents: []
+        };
+    }
+}
+
+/**
+ * Maximum uint256 value for unlimited approval (from ethers)
+ * Re-exported for compatibility
+ */
+export const MAX_UINT256 = MaxUint256;
+
+/**
+ * Check if an allowance amount represents unlimited approval
+ */
+export function isUnlimitedApproval(allowance: bigint): boolean {
+    // Consider it unlimited if it's more than half of MaxUint256
+    // This accounts for potential small decreases due to usage
+    return allowance > (MaxUint256 / BigInt(2));
+}
+
+/**
+ * Format approval status for display
+ */
+export function formatApprovalStatus(allowance: bigint, requiredAmount: bigint): {
+    status: 'unlimited' | 'sufficient' | 'insufficient';
+    message: string;
+} {
+    if (isUnlimitedApproval(allowance)) {
+        return {
+            status: 'unlimited',
+            message: 'Unlimited approval granted'
+        };
+    }
+    
+    if (allowance >= requiredAmount) {
+        return {
+            status: 'sufficient',
+            message: `Sufficient approval: ${formatCurrency(allowance, 6, '', 2)} USDT`
+        };
+    }
+    
+    return {
+        status: 'insufficient',
+        message: `Approval needed: ${formatCurrency(requiredAmount - allowance, 6, '', 2)} USDT`
+    };
 }
 
 /**

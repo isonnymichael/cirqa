@@ -1,5 +1,6 @@
 import { PreparedTransaction, getContract, prepareContractCall, sendTransaction, readContract } from 'thirdweb';
 import { Account } from 'thirdweb/wallets';
+import { MaxUint256 } from 'ethers';
 import { cirqaCore, cirqaTokenContract, usdtTokenContract, scholarshipManagerContract } from '@/lib/contracts';
 
 // Types for scholarship data
@@ -41,17 +42,35 @@ export async function createScholarship(params: CreateScholarshipParams): Promis
     try {
         const { metadata, account } = params;
 
+        console.log('CreateScholarship Helper - Input params:', params);
+        console.log('CreateScholarship Helper - Metadata:', metadata);
+        console.log('CreateScholarship Helper - Metadata type:', typeof metadata);
+        console.log('CreateScholarship Helper - Metadata length:', metadata?.length);
+        console.log('CreateScholarship Helper - Account:', account?.address);
+
+        // Validate input
+        if (!metadata || typeof metadata !== 'string') {
+            throw new Error(`Invalid metadata provided: ${metadata}. Expected string.`);
+        }
+
+        if (!account) {
+            throw new Error('No account provided for transaction signing.');
+        }
+
         const transaction = prepareContractCall({
             contract: cirqaCore,
             method: "function createScholarship(string memory metadata) external returns (uint256)",
             params: [metadata]
         });
 
+        console.log('CreateScholarship Helper - Transaction prepared with params:', [metadata]);
+
         const result = await sendTransaction({
             transaction,
             account
         });
 
+        console.log('CreateScholarship Helper - Transaction result:', result);
         return result.transactionHash;
     } catch (error) {
         console.error('Error creating scholarship:', error);
@@ -73,18 +92,20 @@ export async function fundScholarship(params: FundScholarshipParams): Promise<st
             params: [account.address, cirqaCore.address]
         });
 
-        // If allowance is insufficient, approve first
+        // If allowance is insufficient, approve unlimited amount
         if (currentAllowance < amount) {
             const approveTransaction = prepareContractCall({
                 contract: usdtTokenContract,
                 method: "function approve(address spender, uint256 amount) returns (bool)",
-                params: [cirqaCore.address, amount]
+                params: [cirqaCore.address, MaxUint256]
             });
 
             await sendTransaction({
                 transaction: approveTransaction,
                 account
             });
+            
+            console.log('✅ USDT unlimited approval granted for Core contract');
         }
 
         // Now fund the scholarship
@@ -239,11 +260,17 @@ export async function isStudent(tokenId: number, address: string): Promise<boole
  */
 export async function getScholarshipMetadata(tokenId: number): Promise<string> {
     try {
+        console.log('GetScholarshipMetadata - Requesting tokenId:', tokenId);
+        
         const uri = await readContract({
             contract: cirqaCore,
             method: "function tokenURI(uint256 tokenId) view returns (string)",
             params: [BigInt(tokenId)]
         });
+
+        console.log('GetScholarshipMetadata - Raw response from contract:', uri);
+        console.log('GetScholarshipMetadata - Response type:', typeof uri);
+        console.log('GetScholarshipMetadata - Response length:', uri?.length);
 
         return uri;
     } catch (error) {

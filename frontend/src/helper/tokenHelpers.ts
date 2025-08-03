@@ -1,11 +1,11 @@
 import { prepareContractCall, sendTransaction, readContract } from 'thirdweb';
 import { Account } from 'thirdweb/wallets';
+import { MaxUint256 } from 'ethers';
 import { cirqaTokenContract, usdtTokenContract, cirqaCore } from '@/lib/contracts';
 
 // Types for token operations
 export interface ApproveTokenParams {
     spender: string;
-    amount: bigint;
     account: Account;
 }
 
@@ -77,16 +77,16 @@ export async function getUSDTAllowance(owner: string): Promise<bigint> {
 }
 
 /**
- * Approve USDT spending for Core contract
+ * Approve unlimited USDT spending for Core contract
  */
-export async function approveUSDT(params: { amount: bigint; account: Account }): Promise<string> {
+export async function approveUSDT(params: { account: Account }): Promise<string> {
     try {
-        const { amount, account } = params;
+        const { account } = params;
 
         const transaction = prepareContractCall({
             contract: usdtTokenContract,
             method: "function approve(address spender, uint256 amount) returns (bool)",
-            params: [cirqaCore.address, amount]
+            params: [cirqaCore.address, MaxUint256]
         });
 
         const result = await sendTransaction({
@@ -98,6 +98,72 @@ export async function approveUSDT(params: { amount: bigint; account: Account }):
     } catch (error) {
         console.error('Error approving USDT:', error);
         throw new Error(`Failed to approve USDT: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Approve unlimited Cirqa token spending for Core contract
+ */
+export async function approveCirqa(params: { account: Account }): Promise<string> {
+    try {
+        const { account } = params;
+
+        const transaction = prepareContractCall({
+            contract: cirqaTokenContract,
+            method: "function approve(address spender, uint256 amount) returns (bool)",
+            params: [cirqaCore.address, MaxUint256]
+        });
+
+        const result = await sendTransaction({
+            transaction,
+            account
+        });
+
+        return result.transactionHash;
+    } catch (error) {
+        console.error('Error approving Cirqa:', error);
+        throw new Error(`Failed to approve Cirqa: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Check if unlimited approval is needed for USDT
+ */
+export async function needsUSDTApproval(owner: string, requiredAmount: bigint): Promise<boolean> {
+    try {
+        const allowance = await getUSDTAllowance(owner);
+        // Consider approval needed if allowance is less than required amount
+        // or if allowance is significantly less than MaxUint256 (to handle potential precision issues)
+        return allowance < requiredAmount || allowance < (MaxUint256 / BigInt(2));
+    } catch (error) {
+        console.error('Error checking USDT approval needs:', error);
+        return true; // Default to requiring approval if check fails
+    }
+}
+
+/**
+ * Auto-approve USDT if needed for a specific amount
+ * Returns true if approval was successful or not needed
+ */
+export async function ensureUSDTApproval(params: { account: Account; requiredAmount: bigint }): Promise<boolean> {
+    try {
+        const { account, requiredAmount } = params;
+        
+        // Check if approval is needed
+        const needsApproval = await needsUSDTApproval(account.address, requiredAmount);
+        
+        if (needsApproval) {
+            console.log('🔄 USDT approval needed, requesting unlimited approval...');
+            await approveUSDT({ account });
+            console.log('✅ USDT unlimited approval granted successfully');
+            return true;
+        }
+        
+        console.log('✅ USDT approval already sufficient');
+        return true;
+    } catch (error) {
+        console.error('❌ Error ensuring USDT approval:', error);
+        throw new Error(`Failed to ensure USDT approval: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
 

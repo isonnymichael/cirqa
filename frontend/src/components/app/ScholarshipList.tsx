@@ -7,14 +7,18 @@ import {
   getScholarshipsByStudent, 
   getScholarshipMetadata,
   getScholarshipOwner,
+  getScholarshipScore,
   formatCurrency,
   formatAddress,
   handleContractError,
-  retryWithBackoff
+  retryWithBackoff,
+  parseMetadata,
+  fetchIpfsMetadata,
+  convertIpfsToHttp,
+  ParsedMetadata
 } from '@/helper';
-import FundScholarshipModal from './FundScholarshipModal';
-import WithdrawFundsModal from './WithdrawFundsModal';
 import ScholarshipFilter, { FilterOptions } from './ScholarshipFilter';
+import ScholarshipDetails from './ScholarshipDetails';
 import Spinner from '@/app/Spinner';
 
 type Scholarship = {
@@ -22,6 +26,7 @@ type Scholarship = {
   student: string;
   balance: bigint;
   metadata: string;
+  score: bigint;
   exists: boolean;
 };
 
@@ -29,17 +34,44 @@ const ScholarshipList: React.FC = () => {
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null);
-  const [isFundModalOpen, setIsFundModalOpen] = useState(false);
-  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [selectedScholarshipId, setSelectedScholarshipId] = useState<number | null>(null);
+  const [ipfsMetadataCache, setIpfsMetadataCache] = useState<Record<string, ParsedMetadata>>({});
   const [filters, setFilters] = useState<FilterOptions>({
     showOwned: false,
     minBalance: '0',
+    minScore: '0',
     sortBy: 'id',
     sortOrder: 'asc'
   });
   
   const account = useActiveAccount();
+  
+  // Get parsed metadata with IPFS support
+  const getParsedMetadata = (metadataString: string, scholarshipId: number): ParsedMetadata => {
+    const basicParsed = parseMetadata(metadataString);
+    
+    // If it's an IPFS URL that needs fetching
+    if (basicParsed.ipfsUrl) {
+      // Check cache first
+      const cached = ipfsMetadataCache[basicParsed.ipfsUrl];
+      if (cached) {
+        return cached;
+      }
+      
+      // Trigger async fetch (fire and forget)
+      fetchIpfsMetadata(basicParsed.ipfsUrl, scholarshipId).then(fetchedMetadata => {
+        setIpfsMetadataCache(prev => ({
+          ...prev,
+          [basicParsed.ipfsUrl!]: fetchedMetadata
+        }));
+      });
+      
+      // Return loading state for now
+      return basicParsed;
+    }
+    
+    return basicParsed;
+  };
 
   // Fetch scholarships data
   const fetchScholarships = async () => {
@@ -60,9 +92,13 @@ const ScholarshipList: React.FC = () => {
       const scholarshipDetails = await Promise.all(
         scholarshipIds.map(async (id) => {
           try {
-            const [metadata, owner] = await Promise.all([
+            const [metadata, owner, score] = await Promise.all([
               getScholarshipMetadata(id),
-              getScholarshipOwner(id)
+              getScholarshipOwner(id),
+              retryWithBackoff(() => getScholarshipScore(id)).catch((err) => {
+                console.log(`Score not available for scholarship ${id}:`, err);
+                return BigInt(0);
+              })
             ]);
 
             return {
@@ -70,6 +106,7 @@ const ScholarshipList: React.FC = () => {
               student: owner,
               balance: BigInt(0), // Will be updated with real balance from contract
               metadata,
+              score: score || BigInt(0), // Ensure score is never undefined
               exists: true
             };
           } catch (err) {
@@ -97,26 +134,18 @@ const ScholarshipList: React.FC = () => {
     fetchScholarships();
   }, [account]);
 
-  const handleFundClick = (scholarship: Scholarship) => {
-    setSelectedScholarship(scholarship);
-    setIsFundModalOpen(true);
+  // Force re-render when IPFS metadata cache updates
+  useEffect(() => {
+    // This will trigger a re-render of the component when IPFS metadata is loaded
+    // No additional logic needed, just the dependency will cause re-render
+  }, [ipfsMetadataCache]);
+
+  const handleScholarshipClick = (scholarshipId: number) => {
+    setSelectedScholarshipId(scholarshipId);
   };
 
-  const handleWithdrawClick = (scholarship: Scholarship) => {
-    setSelectedScholarship(scholarship);
-    setIsWithdrawModalOpen(true);
-  };
-
-  const handleFundComplete = () => {
-    setIsFundModalOpen(false);
-    // Refresh scholarship data
-    fetchScholarships();
-  };
-
-  const handleWithdrawComplete = () => {
-    setIsWithdrawModalOpen(false);
-    // Refresh scholarship data
-    fetchScholarships();
+  const handleBackToList = () => {
+    setSelectedScholarshipId(null);
   };
 
   const handleRetry = () => {
@@ -140,14 +169,27 @@ const ScholarshipList: React.FC = () => {
       parseFloat(s.balance.toString()) >= minBalanceWei
     );
     
+    // Filter by minimum score
+    if (filters.minScore && parseInt(filters.minScore) > 0) {
+      const minScoreValue = parseInt(filters.minScore) * 100; // Convert to contract format (2 decimal precision)
+      result = result.filter(s => {
+        const scoreValue = s.score ? Number(s.score) : 0;
+        return scoreValue >= minScoreValue;
+      });
+    }
+    
     // Sort the results
     result.sort((a, b) => {
       if (filters.sortBy === 'id') {
         return filters.sortOrder === 'asc' ? a.id - b.id : b.id - a.id;
-      } else { // balance
+      } else if (filters.sortBy === 'balance') {
         const balanceA = parseFloat(a.balance.toString());
         const balanceB = parseFloat(b.balance.toString());
         return filters.sortOrder === 'asc' ? balanceA - balanceB : balanceB - balanceA;
+      } else { // score
+        const scoreA = a.score ? Number(a.score) : 0;
+        const scoreB = b.score ? Number(b.score) : 0;
+        return filters.sortOrder === 'asc' ? scoreA - scoreB : scoreB - scoreA;
       }
     });
     
@@ -157,6 +199,24 @@ const ScholarshipList: React.FC = () => {
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
   };
+
+  // Show scholarship detail view
+  if (selectedScholarshipId !== null) {
+    return (
+      <div>
+        <button
+          onClick={handleBackToList}
+          className="cursor-pointer mb-4 flex items-center text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Scholarships
+        </button>
+        <ScholarshipDetails scholarshipId={selectedScholarshipId} onClose={handleBackToList} />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -208,81 +268,100 @@ const ScholarshipList: React.FC = () => {
         Showing {filteredScholarships.length} of {scholarships.length} scholarships
       </div>
       
-      {/* Scholarship Cards */}
-      <div className="space-y-4">
+      {/* Scholarship Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredScholarships.map((scholarship) => {
+          const metadata = getParsedMetadata(scholarship.metadata, scholarship.id);
           const isOwner = account?.address.toLowerCase() === scholarship.student.toLowerCase();
           
           return (
-            <div key={scholarship.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-lg font-semibold">Scholarship #{scholarship.id}</h3>
-                <span className="text-xs bg-blue-900/30 text-blue-400 px-2 py-1 rounded">
-                  {isOwner ? 'Your Scholarship' : 'Available for Funding'}
+            <div 
+              key={scholarship.id} 
+              onClick={() => handleScholarshipClick(scholarship.id)}
+              className="bg-gray-800 rounded-lg border border-gray-700 hover:border-blue-500 hover:shadow-lg transition-all duration-200 cursor-pointer group overflow-hidden"
+            >
+              {/* Scholarship Image */}
+              <div className="relative h-48 bg-gray-700">
+                {metadata.image ? (
+                  <img
+                    src={metadata.image}
+                    alt={metadata.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      target.nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <div className={`absolute inset-0 flex items-center justify-center bg-gray-700 ${metadata.image ? 'hidden' : ''}`}>
+                  <div className="text-center text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <p className="text-xs">No Image</p>
+                  </div>
+                </div>
+                
+                {/* Overlay badges */}
+                <div className="absolute top-2 left-2">
+                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                    #{scholarship.id}
                 </span>
               </div>
               
-              <div className="mb-4 space-y-2">
-                <div>
-                  <p className="text-sm text-gray-400">Student</p>
-                  <p className="font-mono text-sm">{formatAddress(scholarship.student)}</p>
-                </div>
-                
-                <div>
-                  <p className="text-sm text-gray-400">Metadata</p>
-                  <p className="text-sm break-all">{scholarship.metadata}</p>
-                </div>
-                
-                <div>
-                  <p className="text-sm text-gray-400">Current Balance</p>
-                  <p className="text-lg font-medium">
-                    {formatCurrency(scholarship.balance, 6, 'USDT ', 2)}
-                  </p>
+                <div className="absolute top-2 right-2">
+                  {isOwner ? (
+                    <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                      Mine
+                    </span>
+                  ) : (
+                    <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded">
+                      Available
+                    </span>
+                  )}
                 </div>
               </div>
               
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleFundClick(scholarship)}
-                  className="flex-1 px-3 py-2 bg-green-700 text-white rounded-md hover:bg-green-800 transition-colors text-sm font-medium"
-                  disabled={!account}
-                >
-                  💰 Fund
-                </button>
+              {/* Scholarship Info */}
+              <div className="p-3 space-y-2">
+                {/* Title */}
+                <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors overflow-hidden" style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical'
+                }}>
+                  {metadata.name}
+                </h3>
                 
-                {isOwner && (
-                  <button
-                    onClick={() => handleWithdrawClick(scholarship)}
-                    className="flex-1 px-3 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-800 transition-colors text-sm font-medium"
-                    disabled={scholarship.balance <= BigInt(0)}
-                  >
-                    💸 Withdraw
-                  </button>
-                )}
+                {/* Student */}
+                <p className="text-xs text-gray-400 font-mono">
+                  {formatAddress(scholarship.student)}
+                </p>
+                
+                {/* Stats */}
+                <div className="flex justify-between items-center pt-2 border-t border-gray-700">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400">Balance</p>
+                    <p className="text-sm font-medium text-green-400">
+                      {formatCurrency(scholarship.balance, 6, '', 0)}
+                    </p>
+                    <p className="text-xs text-gray-500">USDT</p>
+                  </div>
+                  
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400">Score</p>
+                    <p className="text-sm font-medium text-yellow-400">
+                      {scholarship.score ? (Number(scholarship.score) / 100).toFixed(1) : '0.0'}
+                    </p>
+                    <p className="text-xs text-gray-500">⭐ Rating</p>
+                  </div>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
-
-      {/* Modals */}
-      {selectedScholarship && (
-        <>
-          <FundScholarshipModal
-            isOpen={isFundModalOpen}
-            onClose={() => setIsFundModalOpen(false)}
-            onFundComplete={handleFundComplete}
-            scholarship={selectedScholarship}
-          />
-          
-          <WithdrawFundsModal
-            isOpen={isWithdrawModalOpen}
-            onClose={() => setIsWithdrawModalOpen(false)}
-            onWithdrawComplete={handleWithdrawComplete}
-            scholarship={selectedScholarship}
-          />
-        </>
-      )}
     </div>
   );
 };

@@ -35,7 +35,9 @@ export type {
 } from './adminHelpers';
 
 export type {
-    UpdateScoreParams
+    UpdateScoreParams,
+    RateScholarshipParams,
+    InvestorRating
 } from './scoreHelpers';
 
 // Utility helpers provide formatting and validation functions

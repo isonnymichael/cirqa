@@ -64,6 +64,16 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
     clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID!,
   }), []);
 
+  // Convert IPFS URI to HTTP gateway URL
+  const convertIpfsToHttp = (uri: string): string => {
+    if (uri.startsWith('ipfs://')) {
+      // Extract CID from ipfs://CID or ipfs://CID/path
+      const ipfsPath = uri.replace('ipfs://', '');
+      return `https://ipfs.io/ipfs/${ipfsPath}`;
+    }
+    return uri;
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setMetadata(prev => ({
       ...prev,
@@ -247,13 +257,54 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
         version: "1.0"
       };
 
-      const uris = await upload({
+      const uploadResult = await upload({
         client,
         files: [metadataToUpload]
       });
 
-      const metadataUri = uris[0];
-      console.log('Metadata uploaded to IPFS:', metadataUri);
+      console.log('IPFS Upload Result - Raw response:', uploadResult);
+      console.log('IPFS Upload Result - Response type:', typeof uploadResult);
+      if (typeof uploadResult === 'string' || Array.isArray(uploadResult)) {
+        console.log('IPFS Upload Result - Response length:', uploadResult.length);
+      }
+
+      // Handle both string and array responses from Thirdweb upload
+      let metadataUri: string;
+      if (typeof uploadResult === 'string') {
+        // Direct string response
+        metadataUri = uploadResult;
+        console.log('IPFS Upload - Direct string response:', metadataUri);
+      } else if (Array.isArray(uploadResult) && (uploadResult as string[]).length > 0) {
+        // Array response
+        metadataUri = (uploadResult as string[])[0];
+        console.log('IPFS Upload - Array response, first item:', metadataUri);
+      } else {
+        throw new Error(`Unexpected IPFS upload response format: ${JSON.stringify(uploadResult)}`);
+      }
+
+      console.log('IPFS Upload - Extracted URI:', metadataUri);
+      console.log('IPFS Upload - URI type:', typeof metadataUri);
+      console.log('IPFS Upload - URI length:', metadataUri?.length);
+      console.log('IPFS Upload - URI starts with ipfs:', metadataUri?.startsWith?.('ipfs://'));
+      
+      // Validate URI before proceeding
+      if (!metadataUri || typeof metadataUri !== 'string' || metadataUri.length < 10) {
+        throw new Error(`Invalid IPFS URI received: ${metadataUri}. Expected valid IPFS URL.`);
+      }
+      
+      if (!metadataUri.startsWith('ipfs://')) {
+        console.warn('IPFS URI does not start with ipfs://, received:', metadataUri);
+        // If it's just the hash, prepend ipfs://
+        if (metadataUri.length > 40 && !metadataUri.includes('://')) {
+          const fixedUri = `ipfs://${metadataUri}`;
+          console.log('Fixed URI:', fixedUri);
+          metadataUri = fixedUri;
+        } else {
+          throw new Error(`Invalid IPFS URI format: ${metadataUri}. Expected ipfs:// URL.`);
+        }
+      }
+      
+      console.log('Final metadata URI to be sent to blockchain:', metadataUri);
 
       // Step 2: Create scholarship NFT on blockchain
       setCreateStatus({
@@ -386,9 +437,13 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
               ) : (
                 <div className="relative">
                   <img
-                    src={metadata.image}
+                    src={convertIpfsToHttp(metadata.image)}
                     alt="Preview"
                     className="w-full h-32 object-contain bg-gray-900 rounded-lg"
+                    onError={(e) => {
+                      console.error('Failed to load form image:', metadata.image);
+                      console.log('Converted URL:', convertIpfsToHttp(metadata.image));
+                    }}
                   />
                   <button
                     type="button"
@@ -529,9 +584,13 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
             <div className="bg-gray-700/30 rounded-lg p-3 border-2 border-dashed border-gray-600">
               {metadata.image ? (
                 <img
-                  src={metadata.image}
+                  src={convertIpfsToHttp(metadata.image)}
                   alt="Student"
                   className="w-full h-24 object-contain bg-gray-900 rounded"
+                  onError={(e) => {
+                    console.error('Failed to load image:', metadata.image);
+                    console.log('Converted URL:', convertIpfsToHttp(metadata.image));
+                  }}
                 />
               ) : (
                 <div className="h-24 flex items-center justify-center text-gray-500 text-xs">
