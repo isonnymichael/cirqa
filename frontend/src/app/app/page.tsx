@@ -1,22 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useActiveAccount, useActiveWalletChain, useReadContract } from 'thirdweb/react';
+import React, { useState, useCallback } from 'react';
+import Link from 'next/link';
+import ScholarshipList from '@/components/app/ScholarshipList';
+import ScholarshipStats from '@/components/app/ScholarshipStats';
+import NotificationBanner from '@/components/app/NotificationBanner';
+import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react';
 import { kiiTestnet } from '@/lib/chain';
-import { cirqaTokenContract, cirqaProtocolContract } from '@/lib/contracts';
-import { formatUnits } from 'ethers';
-
-// Components for the lending/borrowing app
-import MarketOverview from '@/components/app/MarketOverview';
-import AssetList from '@/components/app/AssetList';
-import UserStats from '@/components/app/UserStats';
 
 export default function AppPage() {
-  const [activeTab, setActiveTab] = useState('supply');
   const account = useActiveAccount();
   const chain = useActiveWalletChain();
+  
+  // State for managing view mode and stats refresh
+  const [isDetailView, setIsDetailView] = useState(false);
+  const [statsRefreshTrigger, setStatsRefreshTrigger] = useState(0);
 
+  // Handle view mode changes from ScholarshipList
+  const handleViewModeChange = useCallback((detailView: boolean) => {
+    console.log(`🔄 View mode changed: ${detailView ? 'Detail View' : 'List View'}`);
+    setIsDetailView(detailView);
+  }, []);
 
+  // Handle stats refresh requests
+  const handleRefreshStats = useCallback(() => {
+    console.log('📊 Refreshing global statistics...');
+    setStatsRefreshTrigger(prev => prev + 1);
+  }, []);
 
   if (!account || (chain && chain.id !== kiiTestnet.id)) {
     return (
@@ -30,42 +40,48 @@ export default function AppPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background py-8">
+    <main className="min-h-screen bg-background">
       <div className="container mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Cirqa Markets</h1>
-          <p className="text-gray-400">Supply assets and earn interest or borrow against your collateral</p>
-        </div>
-        
-        {/* User Stats */}
-        <UserStats />
-        
-        {/* Market Overview */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Market Overview</h2>
-          <MarketOverview />
-        </div>
-        
-        {/* Supply and Borrow Tabs */}
-        <div className="mt-8">
-          <div className="flex border-b border-gray-800 mb-6">
-            <button
-              className={`py-2 px-4 font-medium cursor-pointer ${activeTab === 'supply' ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}
-              onClick={() => setActiveTab('supply')}
-            >
-              Supply
-            </button>
-            <button
-              className={`py-2 px-4 font-medium cursor-pointer ${activeTab === 'borrow' ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}
-              onClick={() => setActiveTab('borrow')}
-            >
-              Borrow
-            </button>
-            {/* Removed refresh button and added auto-refresh when switching tabs */}
-          </div>
           
-          {/* Asset List based on active tab */}
-          <AssetList type={activeTab as 'supply' | 'borrow'} />
+          <div className="mb-6">
+            <NotificationBanner 
+              type="info" 
+              message="This platform is currently in beta testing on the Kii Testnet. All scholarships and transactions are for demonstration purposes only." 
+            />
+          </div>
+        
+        {/* Scholarship Stats - Hidden during detail view */}
+        {!isDetailView && (
+          <div className="mb-8">
+            <ScholarshipStats refreshTrigger={statsRefreshTrigger} />
+          </div>
+        )}
+        
+        {/* Scholarship Sections */}
+        <div className="mt-8">
+          <div className="mt-8">
+            {/* Header - Hidden during detail view */}
+            {!isDetailView && (
+              <div className="flex justify-between mb-4">
+                <h2 className="text-2xl font-bold mb-4">Scholarships</h2>
+
+                <Link 
+                  href="/app/metadata" 
+                  className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-3 rounded"
+                >
+                  <span className="hidden md:inline">Create New Scholarship</span>
+                  <span className="inline md:hidden">Create New</span>
+                </Link>
+              </div>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+              <ScholarshipList 
+                onViewModeChange={handleViewModeChange}
+                onRefreshStats={handleRefreshStats}
+              />
+            </div>
+          </div>
+
         </div>
       </div>
     </main>

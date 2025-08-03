@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "deploy": "rm -rf ignition/deployments/chain-1336 && npx hardhat ignition deploy ignition/modules/Deploy.ts --network kiiTestnet",
+    "contract-info": "npx hardhat run ignition/modules/ContractInfo.ts --network kiiTestnet",
+    "scholarships-info": "npx hardhat run ignition/modules/ScholarshipsInfo.ts --network kiiTestnet"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +17,6 @@
     "hardhat": "^2.26.1"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.4.0"
+    "@openzeppelin/contracts": "^4.9.0"
   }
 }
