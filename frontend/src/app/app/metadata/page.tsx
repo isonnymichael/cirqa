@@ -10,6 +10,12 @@ const MetadataGeneratorPage: React.FC = () => {
     console.log('Metadata generated:', metadata);
   };
 
+  const handleCreateScholarship = (metadata: any, json: string) => {
+    // This will integrate with the actual create scholarship flow
+    console.log('Creating scholarship with metadata:', metadata);
+    alert('Scholarship creation will be implemented - this will connect to CreateScholarshipModal');
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center mb-6">
@@ -24,7 +30,10 @@ const MetadataGeneratorPage: React.FC = () => {
         <h1 className="text-2xl font-bold">Create New Scholarship</h1>
       </div>
 
-      <ScholarshipMetadataForm onMetadataGenerated={handleMetadataGenerated} />
+      <ScholarshipMetadataForm 
+        onMetadataGenerated={handleMetadataGenerated}
+        onCreateScholarship={handleCreateScholarship}
+      />
     </div>
   );
 };

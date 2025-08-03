@@ -16,11 +16,13 @@ type ScholarshipMetadata = {
 
 type ScholarshipMetadataFormProps = {
   onMetadataGenerated: (metadata: ScholarshipMetadata, jsonString: string) => void;
+  onCreateScholarship?: (metadata: ScholarshipMetadata, jsonString: string) => void;
   className?: string;
 };
 
 const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({ 
   onMetadataGenerated,
+  onCreateScholarship,
   className = '' 
 }) => {
   const [metadata, setMetadata] = useState<ScholarshipMetadata>({
@@ -41,6 +43,8 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setMetadata(prev => ({
@@ -154,6 +158,59 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
     onMetadataGenerated(finalMetadata, jsonString);
   }, [finalMetadata, jsonString]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ESC key handler for modal
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showConfirmModal) {
+        handleCloseModal();
+      }
+    };
+
+    if (showConfirmModal) {
+      document.addEventListener('keydown', handleEscKey);
+      // Prevent background scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+      document.body.style.overflow = 'unset';
+    };
+  }, [showConfirmModal]);
+
+  // Validation functions
+  const validateRequiredFields = () => {
+    const missingFields = [];
+    
+    if (!metadata.name.trim()) missingFields.push('Scholarship Name');
+    if (!metadata.description.trim()) missingFields.push('Description');
+    if (!metadata.image) missingFields.push('Student Photo');
+    if (!metadata.contact.email.trim()) missingFields.push('Email Contact');
+    
+    // Check if at least 2 attributes are filled
+    const filledAttributes = metadata.attributes.filter(attr => attr.value.trim() !== '');
+    if (filledAttributes.length < 2) missingFields.push('At least 2 Academic Information fields');
+    
+    return missingFields;
+  };
+
+  const handleCreateClick = () => {
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmCreate = () => {
+    if (termsAccepted && onCreateScholarship) {
+      setShowConfirmModal(false);
+      setTermsAccepted(false);
+      onCreateScholarship(finalMetadata, jsonString);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowConfirmModal(false);
+    setTermsAccepted(false);
+  };
+
   return (
     <div className={`${className}`}>
       {/* Main Grid: Form (larger) + Preview (smaller) */}
@@ -218,7 +275,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                   <button
                     type="button"
                     onClick={removeImage}
-                    className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                    className="cursor-pointer absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
                   >
                     ✕
                   </button>
@@ -276,7 +333,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                 <button
                   type="button"
                   onClick={addDocument}
-                  className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors"
+                  className="cursor-pointer text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors"
                 >
                   + Add Document
                 </button>
@@ -296,7 +353,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                         <button
                           type="button"
                           onClick={() => removeDocument(index)}
-                          className="text-red-400 hover:text-red-300 text-xs"
+                          className="cursor-pointer text-red-400 hover:text-red-300 text-xs"
                         >
                           ✕ Remove
                         </button>
@@ -347,7 +404,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
 
         {/* Right Column: Live Preview (1/3 width) */}
         <div className="lg:col-span-1 bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <h2 className="text-base font-semibold mb-3">Live Preview</h2>
+          <h2 className="text-base font-semibold mb-3">Preview</h2>
           
           <div className="space-y-3">
             {/* Image Preview */}
@@ -454,20 +511,208 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                 <h4 className="text-xs font-medium text-gray-300">📋 Generated JSON</h4>
                 <button
                   onClick={() => navigator.clipboard.writeText(jsonString)}
-                  className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors"
+                  className="cursor-pointer text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors"
                   title="Copy JSON"
                 >
                   📋
                 </button>
               </div>
               
-              <pre className="bg-gray-900 rounded p-2 text-xs text-green-400 overflow-x-auto max-h-32 overflow-y-auto">
+              <pre className="bg-gray-900 rounded p-2 text-xs text-green-400 overflow-x-auto max-h-64 overflow-y-auto">
                 {jsonString}
               </pre>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Bottom Section: Terms & Create Button */}
+      <div className="mt-6 space-y-4">
+
+        {/* Action Buttons */}
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-center sm:text-left">
+              <h3 className="text-lg font-semibold text-white mb-1">Ready to Create Your Scholarship?</h3>
+              <p className="text-sm text-gray-400">
+                Your metadata is automatically generated. Review the preview and click create when ready.
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              
+              <button
+                type="button"
+                disabled={validateRequiredFields().length > 0}
+                className="cursor-pointer px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center"
+                onClick={handleCreateClick}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create New Scholarship
+              </button>
+            </div>
+          </div>
+          
+          {validateRequiredFields().length > 0 && (
+            <div className="mt-3 p-2 bg-orange-900/20 rounded border border-orange-700">
+              <p className="text-orange-400 text-xs mb-1">
+                ⚠️ Please complete the following required fields:
+              </p>
+              <ul className="text-orange-300 text-xs space-y-1">
+                {validateRequiredFields().map((field, index) => (
+                  <li key={index}>• {field}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={(e) => e.target === e.currentTarget && handleCloseModal()}
+        >
+          <div className="bg-gray-800 rounded-lg border border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">⚠️ Confirm Scholarship Creation</h2>
+                <button
+                  onClick={handleCloseModal}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Data Completeness Check */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-white mb-3">📋 Data Completeness Check</h3>
+                {(() => {
+                  const missingFields = validateRequiredFields();
+                  return missingFields.length === 0 ? (
+                    <div className="bg-green-900/20 border border-green-700 rounded p-3">
+                      <p className="text-green-400 text-sm">✅ All required fields are complete!</p>
+                    </div>
+                  ) : (
+                    <div className="bg-red-900/20 border border-red-700 rounded p-3">
+                      <p className="text-red-400 text-sm mb-2">❌ Missing required fields:</p>
+                      <ul className="text-red-300 text-sm space-y-1">
+                        {missingFields.map((field, index) => (
+                          <li key={index}>• {field}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Blockchain Warning */}
+              <div className="mb-6">
+                <div className="bg-yellow-900/20 border border-yellow-700 rounded p-4">
+                  <h3 className="text-lg font-medium text-yellow-400 mb-2">🔗 Blockchain Permanency Warning</h3>
+                  <div className="text-sm text-yellow-100 space-y-2">
+                    <p><strong>⚠️ IMPORTANT:</strong> Once created, your scholarship data will be stored permanently on the blockchain and <strong>CANNOT be deleted or modified</strong>.</p>
+                    <ul className="space-y-1 text-yellow-200 ml-4">
+                      <li>• Your information will be publicly visible</li>
+                      <li>• Photo and documents will be stored as base64 data</li>
+                      <li>• Smart contract interactions are irreversible</li>
+                      <li>• All transactions are recorded permanently</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Data Preview Summary */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-white mb-3">📄 Your Scholarship Summary</h3>
+                <div className="bg-gray-700/50 rounded p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Name:</span>
+                    <span className="text-white">{metadata.name || 'Not set'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Photo:</span>
+                    <span className="text-white">{metadata.image ? '✅ Uploaded' : '❌ Missing'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Email:</span>
+                    <span className="text-white">{metadata.contact.email || 'Not set'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Academic Info:</span>
+                    <span className="text-white">
+                      {metadata.attributes.filter(attr => attr.value.trim() !== '').length}/4 fields
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Documents:</span>
+                    <span className="text-white">
+                      {metadata.documents.filter(doc => doc.name.trim() !== '' && doc.url.trim() !== '').length} attached
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Terms & Conditions Checkbox */}
+              <div className="mb-6">
+                <div className="bg-gray-700/30 rounded p-4">
+                  <label className="flex items-start space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-1 w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <div className="text-sm">
+                      <p className="text-white font-medium mb-1">I have read and agree to the Terms & Conditions</p>
+                      <p className="text-gray-400">
+                        I understand that my scholarship data will be stored permanently on the blockchain, 
+                        that I will use any received funds for educational purposes only, and that all 
+                        transactions are final and irreversible.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmCreate}
+                  disabled={!termsAccepted || validateRequiredFields().length > 0 || !onCreateScholarship}
+                  className="px-6 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Yes, Create Scholarship
+                </button>
+              </div>
+
+              {/* Final Warning */}
+              <div className="mt-4 p-3 bg-red-900/20 border border-red-700 rounded">
+                <p className="text-red-400 text-xs text-center">
+                  ⚠️ By clicking "Yes, Create Scholarship Permanently", you acknowledge that this action is irreversible 
+                  and your data will be permanently recorded on the blockchain.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
