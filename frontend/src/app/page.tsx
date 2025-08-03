@@ -248,7 +248,7 @@ export default function Home() {
             <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] bg-repeat opacity-10"></div>
           </div>
           
-          <div className="container mx-auto relative z-10">
+          <div id="faq" className="container mx-auto relative z-10">
             <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">FREQUENTLY ASKED QUESTIONS</h2>
             
             <div className="max-w-3xl mx-auto space-y-6">
