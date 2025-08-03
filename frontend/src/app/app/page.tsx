@@ -24,7 +24,7 @@ export default function AppPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background py-8">
+    <main className="min-h-screen bg-background">
       <div className="container mx-auto px-4">
           
           <div className="mb-6">
@@ -36,7 +36,6 @@ export default function AppPage() {
         
         {/* Scholarship Stats */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Platform Statistics</h2>
           <ScholarshipStats />
         </div>
         

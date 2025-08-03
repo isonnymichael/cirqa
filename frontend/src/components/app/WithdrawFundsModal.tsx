@@ -1,9 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useActiveAccount, useSendTransaction } from 'thirdweb/react';
-import { cirqaProtocolContract } from '@/lib/contracts';
-import { formatUnits, parseUnits } from 'ethers';
+import React, { useState, useEffect } from 'react';
+import { useActiveAccount } from 'thirdweb/react';
+import { 
+  withdrawFunds, 
+  parseTokenAmount, 
+  formatCurrency,
+  handleContractError,
+  isValidAmount,
+  hasEnoughBalance,
+  isStudent,
+  getProtocolFee
+} from '@/helper';
 import Spinner from '@/app/Spinner';
 
 type Scholarship = {
@@ -31,15 +39,60 @@ const WithdrawFundsModal: React.FC<WithdrawFundsModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [protocolFee, setProtocolFee] = useState<bigint>(BigInt(0));
+  const [loadingData, setLoadingData] = useState(false);
+  const [isValidStudent, setIsValidStudent] = useState(false);
   
   const account = useActiveAccount();
-  const { mutate: sendTransaction, isPending, isError, error: txError } = useSendTransaction();
 
-  const maxBalance = formatUnits(scholarship.balance, 18);
+  // Check if user is the scholarship student and load protocol fee
+  useEffect(() => {
+    if (isOpen && account?.address) {
+      checkStudentAndLoadData();
+    }
+  }, [isOpen, account?.address, scholarship.id]);
+
+  const checkStudentAndLoadData = async () => {
+    if (!account?.address) return;
+    
+    setLoadingData(true);
+    try {
+      const [studentCheck, feeData] = await Promise.all([
+        isStudent(scholarship.id, account.address),
+        getProtocolFee()
+      ]);
+      
+      setIsValidStudent(studentCheck);
+      setProtocolFee(feeData);
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Failed to verify student status');
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  // Calculate amounts after protocol fee
+  const calculateAmounts = (withdrawAmount: string) => {
+    if (!withdrawAmount || !isValidAmount(withdrawAmount)) return null;
+    
+    const amountBigInt = parseTokenAmount(withdrawAmount, 6); // USDT has 6 decimals
+    const feeAmount = (amountBigInt * protocolFee) / BigInt(10000); // Protocol fee in basis points
+    const netAmount = amountBigInt - feeAmount;
+    
+    return {
+      gross: amountBigInt,
+      fee: feeAmount,
+      net: netAmount
+    };
+  };
+
+  const amounts = calculateAmounts(amount);
+  const maxBalance = formatCurrency(scholarship.balance, 6, '', 6); // USDT has 6 decimals
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Only allow numbers and decimals
     const value = e.target.value;
+    // Only allow numbers and decimals
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setAmount(value);
       setError(null);
@@ -56,66 +109,80 @@ const WithdrawFundsModal: React.FC<WithdrawFundsModalProps> = ({
     setError(null);
     setIsLoading(true);
 
+    if (!account) {
+      setError('Please connect your wallet');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!isValidStudent) {
+      setError('Only the scholarship owner can withdraw funds');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       // Validate amount
-      if (!amount || parseFloat(amount) <= 0) {
+      if (!isValidAmount(amount)) {
         setError('Please enter a valid amount');
         setIsLoading(false);
         return;
       }
 
-      // Check if amount is greater than balance
-      if (parseFloat(amount) > parseFloat(maxBalance)) {
-        setError('Amount exceeds available balance');
+      const amountBigInt = parseTokenAmount(amount, 6); // USDT has 6 decimals
+
+      // Check if scholarship has enough balance
+      const hasBalance = await hasEnoughBalance(scholarship.id, amountBigInt);
+      if (!hasBalance) {
+        setError('Insufficient scholarship balance');
         setIsLoading(false);
         return;
       }
 
-      // Convert amount to wei (18 decimals for USDT)
-      const amountInWei = parseUnits(amount, 18);
-
-      // Prepare withdraw transaction
-      const withdrawTx = await cirqaProtocolContract.prepare.withdrawFunds([
-        scholarship.id,
-        amountInWei,
-      ]);
-
-      // Send withdraw transaction
-      sendTransaction(withdrawTx, {
-        onSuccess: async (result) => {
-          try {
-            await result.wait();
-            setIsSuccess(true);
-            setTimeout(() => {
-              onWithdrawComplete();
-              setIsSuccess(false);
-              setAmount('');
-            }, 2000);
-          } catch (err: any) {
-            console.error('Error waiting for withdraw transaction:', err);
-            setError(err.message || 'Failed to withdraw funds');
-          } finally {
-            setIsLoading(false);
-          }
-        },
-        onError: (err: any) => {
-          console.error('Withdraw transaction error:', err);
-          setError(err.message || 'Failed to withdraw funds');
-          setIsLoading(false);
-        },
+      // Withdraw funds
+      const txHash = await withdrawFunds({
+        tokenId: scholarship.id,
+        amount: amountBigInt,
+        account
       });
+
+      console.log('Funds withdrawn successfully:', txHash);
+      setIsSuccess(true);
+      
+      // Show success message for 2 seconds before closing
+      setTimeout(() => {
+        onWithdrawComplete();
+        setIsSuccess(false);
+        setAmount('');
+        onClose();
+      }, 2000);
+
     } catch (err: any) {
-      console.error('Error preparing transaction:', err);
-      setError(err.message || 'Failed to prepare transaction');
+      console.error('Error withdrawing funds:', err);
+      const errorMessage = handleContractError(err);
+      setError(errorMessage);
+    } finally {
       setIsLoading(false);
     }
   };
 
   if (!isOpen) return null;
 
+  // Loading state
+  if (loadingData) {
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-700">
+          <div className="flex justify-center items-center h-32">
+            <Spinner size="lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Check if user is the scholarship owner
-  const isOwner = account?.address.toLowerCase() === scholarship.student.toLowerCase();
-  if (!isOwner) {
+  if (!isValidStudent) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-700">
@@ -147,6 +214,11 @@ const WithdrawFundsModal: React.FC<WithdrawFundsModalProps> = ({
           <div className="text-center py-6">
             <div className="text-green-500 text-xl mb-2">✓</div>
             <p className="text-green-400 font-medium">Funds withdrawn successfully!</p>
+            {amounts && (
+              <p className="text-gray-400 text-sm mt-2">
+                You received: {formatCurrency(amounts.net, 6, '', 2)} USDT
+              </p>
+            )}
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
@@ -179,6 +251,27 @@ const WithdrawFundsModal: React.FC<WithdrawFundsModalProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Fee breakdown */}
+            {amounts && (
+              <div className="mb-4 p-3 bg-gray-700/50 rounded-md">
+                <h4 className="text-sm font-medium mb-2">Fee Breakdown</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Withdrawal Amount:</span>
+                    <span>{formatCurrency(amounts.gross, 6, '', 2)} USDT</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Protocol Fee ({(Number(protocolFee) / 100).toFixed(2)}%):</span>
+                    <span className="text-red-400">-{formatCurrency(amounts.fee, 6, '', 2)} USDT</span>
+                  </div>
+                  <div className="flex justify-between font-medium border-t border-gray-600 pt-1">
+                    <span>You'll receive:</span>
+                    <span className="text-green-400">{formatCurrency(amounts.net, 6, '', 2)} USDT</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {error && (
               <div className="mb-4 p-2 bg-red-900/30 border border-red-800 rounded-md">
