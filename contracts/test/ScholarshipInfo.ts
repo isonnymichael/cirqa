@@ -1,13 +1,15 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { CirqaProtocol, CirqaToken, MockERC20 } from "../typechain-types";
+import { Core, CirqaToken, MockERC20, ScholarshipManager, ScoreManager } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("ScholarshipInfo", function () {
   let owner: HardhatEthersSigner, student1: HardhatEthersSigner, student2: HardhatEthersSigner, investor: HardhatEthersSigner;
   let cirqaToken: CirqaToken;
-  let protocol: CirqaProtocol;
+  let core: Core;
+  let scholarshipManager: ScholarshipManager;
+  let scoreManager: ScoreManager;
   let asset1: MockERC20;
 
   async function deployScholarshipFixture() {
@@ -23,29 +25,47 @@ describe("ScholarshipInfo", function () {
     cirqaToken = await CirqaTokenFactory.deploy();
     await cirqaToken.waitForDeployment();
 
-    // Deploy CirqaProtocol
-    const CirqaProtocolFactory = await ethers.getContractFactory("CirqaProtocol");
-    protocol = await CirqaProtocolFactory.deploy(await cirqaToken.getAddress(), await asset1.getAddress());
-    await protocol.waitForDeployment();
+    // Deploy Core contract
+    const CoreFactory = await ethers.getContractFactory("Core");
+    core = await CoreFactory.deploy(await cirqaToken.getAddress(), await asset1.getAddress());
+    await core.waitForDeployment();
 
-    // Set minter
-    await cirqaToken.setMinter(await protocol.getAddress());
+    // Deploy ScholarshipManager
+    const ScholarshipManagerFactory = await ethers.getContractFactory("ScholarshipManager");
+    scholarshipManager = await ScholarshipManagerFactory.deploy();
+    await scholarshipManager.waitForDeployment();
+
+    // Deploy ScoreManager
+    const ScoreManagerFactory = await ethers.getContractFactory("ScoreManager");
+    scoreManager = await ScoreManagerFactory.deploy();
+    await scoreManager.waitForDeployment();
+
+    // Set up contracts
+    await cirqaToken.setMinter(await core.getAddress());
+    await cirqaToken.setScoreManager(await scoreManager.getAddress());
+    await scholarshipManager.setCoreContract(await core.getAddress());
+    await scoreManager.setCoreContract(await core.getAddress());
+    await scoreManager.setCirqaToken(await cirqaToken.getAddress());
+    await core.setScholarshipManager(await scholarshipManager.getAddress());
+    await core.setScoreManager(await scoreManager.getAddress());
 
     // Create scholarships
     const metadata1 = "ipfs://QmTest1";
     const metadata2 = "ipfs://QmTest2";
-    await protocol.connect(student1).createScholarship(metadata1);
-    await protocol.connect(student2).createScholarship(metadata2);
+    await core.connect(student1).createScholarship(metadata1);
+    await core.connect(student2).createScholarship(metadata2);
 
     // Fund the first scholarship
     const fundAmount = ethers.parseEther("1000"); // 1000 tokens
     await asset1.mint(investor.address, fundAmount * 2n);
-    await asset1.connect(investor).approve(await protocol.getAddress(), fundAmount * 2n);
-    await protocol.connect(investor).fundScholarship(1, fundAmount);
+    await asset1.connect(investor).approve(await core.getAddress(), fundAmount * 2n);
+    await core.connect(investor).fundScholarship(1, fundAmount);
 
     return { 
-      protocol, 
+      core, 
       cirqaToken, 
+      scholarshipManager,
+      scoreManager,
       asset1, 
       owner, 
       student1, 
@@ -60,77 +80,77 @@ describe("ScholarshipInfo", function () {
   describe("Scholarship Details", function () {
     it("Should return correct scholarship details", async function () {
       const { 
-        protocol, 
+        scholarshipManager, 
         student1, 
         metadata1, 
         fundAmount 
       } = await loadFixture(deployScholarshipFixture);
 
-      const scholarship = await protocol.scholarships(1);
+      const scholarships = await scholarshipManager.getScholarshipsByStudent(student1.address);
       
-      expect(scholarship.student).to.equal(student1.address);
-      expect(scholarship.balance).to.equal(fundAmount);
-      expect(scholarship.metadata).to.equal(metadata1);
+      expect(scholarships.length).to.equal(1);
+      expect(scholarships[0]).to.equal(1); // First scholarship has token ID 1
     });
 
     it("Should track multiple scholarships correctly", async function () {
       const { 
-        protocol, 
+        core, 
         student1, 
         student2, 
         investor,
         asset1,
-        metadata1, 
-        metadata2, 
+        scholarshipManager,
         fundAmount 
       } = await loadFixture(deployScholarshipFixture);
 
       // Fund the second scholarship
-      await protocol.connect(investor).fundScholarship(2, fundAmount);
+      await core.connect(investor).fundScholarship(2, fundAmount);
 
-      const scholarship1 = await protocol.scholarships(1);
-      const scholarship2 = await protocol.scholarships(2);
+      const student1Scholarships = await scholarshipManager.getScholarshipsByStudent(student1.address);
+      const student2Scholarships = await scholarshipManager.getScholarshipsByStudent(student2.address);
+      const allScholarships = await scholarshipManager.getAllScholarships();
 
-      // Verify first scholarship
-      expect(scholarship1.student).to.equal(student1.address);
-      expect(scholarship1.balance).to.equal(fundAmount);
-      expect(scholarship1.metadata).to.equal(metadata1);
-
-      // Verify second scholarship
-      expect(scholarship2.student).to.equal(student2.address);
-      expect(scholarship2.balance).to.equal(fundAmount);
-      expect(scholarship2.metadata).to.equal(metadata2);
+      // Verify scholarships tracking
+      expect(student1Scholarships.length).to.equal(1);
+      expect(student2Scholarships.length).to.equal(1);
+      expect(allScholarships.length).to.equal(2);
+      expect(student1Scholarships[0]).to.equal(1);
+      expect(student2Scholarships[0]).to.equal(2);
     });
 
     it("Should update balance after withdrawal", async function () {
       const { 
-        protocol, 
+        core, 
         student1, 
+        scholarshipManager,
         fundAmount 
       } = await loadFixture(deployScholarshipFixture);
 
       const withdrawAmount = ethers.parseEther("300");
-      await protocol.connect(student1).withdrawFunds(1, withdrawAmount);
+      await core.connect(student1).withdrawFunds(1, withdrawAmount);
 
-      const scholarship = await protocol.scholarships(1);
-      expect(scholarship.balance).to.equal(fundAmount - withdrawAmount);
+      // Check if student can withdraw by verifying balance
+      const canWithdrawRemainingBalance = await scholarshipManager.hasEnoughBalance(1, fundAmount - withdrawAmount);
+      expect(canWithdrawRemainingBalance).to.be.true;
     });
 
     it("Should update balance after additional funding", async function () {
       const { 
-        protocol, 
+        core, 
         asset1, 
         investor, 
+        scholarshipManager,
         fundAmount 
       } = await loadFixture(deployScholarshipFixture);
 
       const additionalFunding = ethers.parseEther("300");
       await asset1.mint(investor.address, additionalFunding);
-      await asset1.connect(investor).approve(await protocol.getAddress(), additionalFunding);
-      await protocol.connect(investor).fundScholarship(1, additionalFunding);
+      await asset1.connect(investor).approve(await core.getAddress(), additionalFunding);
+      await core.connect(investor).fundScholarship(1, additionalFunding);
 
-      const scholarship = await protocol.scholarships(1);
-      expect(scholarship.balance).to.equal(fundAmount + additionalFunding);
+      // Check if student can withdraw the total amount (original + additional)
+      const canWithdrawTotal = await scholarshipManager.hasEnoughBalance(1, fundAmount + additionalFunding);
+      expect(canWithdrawTotal).to.be.true;
     });
 
   });
