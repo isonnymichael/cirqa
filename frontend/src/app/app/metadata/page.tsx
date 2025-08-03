@@ -1,36 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import ScholarshipMetadataForm from '@/components/app/ScholarshipMetadataForm';
-import MetadataPreview from '@/components/app/MetadataPreview';
 import Link from 'next/link';
 
-type ScholarshipMetadata = {
-  name: string;
-  description: string;
-  image: string;
-  attributes: Array<{ trait_type: string; value: string }>;
-  contact: {
-    email: string;
-    twitter: string;
-  };
-};
-
 const MetadataGeneratorPage: React.FC = () => {
-  const [generatedMetadata, setGeneratedMetadata] = useState<ScholarshipMetadata | null>(null);
-  const [jsonString, setJsonString] = useState<string>('');
-
-  const handleMetadataGenerated = (metadata: ScholarshipMetadata, json: string) => {
-    setGeneratedMetadata(metadata);
-    setJsonString(json);
-    // Scroll to preview
-    setTimeout(() => {
-      document.getElementById('preview-section')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
-
-  const handleCopy = () => {
-    // Optional: Add analytics or other actions when copying
+  const handleMetadataGenerated = (metadata: any, json: string) => {
+    // Optional: Add analytics or other actions when metadata is generated
+    console.log('Metadata generated:', metadata);
   };
 
   return (
@@ -47,18 +24,7 @@ const MetadataGeneratorPage: React.FC = () => {
         <h1 className="text-2xl font-bold">Create New Scholarship</h1>
       </div>
 
-      <div>
-        <ScholarshipMetadataForm onMetadataGenerated={handleMetadataGenerated} />
-        
-        {generatedMetadata && (
-          <div id="preview-section" className="mt-8">
-            <MetadataPreview 
-              jsonString={jsonString} 
-              onCopy={handleCopy} 
-            />
-          </div>
-        )}
-      </div>
+      <ScholarshipMetadataForm onMetadataGenerated={handleMetadataGenerated} />
     </div>
   );
 };
