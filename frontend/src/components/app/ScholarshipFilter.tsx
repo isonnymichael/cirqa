@@ -12,11 +12,13 @@ export type FilterOptions = {
 
 type ScholarshipFilterProps = {
   onFilterChange: (filters: FilterOptions) => void;
+  onRefresh?: () => void;
   className?: string;
 };
 
 const ScholarshipFilter: React.FC<ScholarshipFilterProps> = ({ 
   onFilterChange,
+  onRefresh,
   className = ''
 }) => {
   const [filters, setFilters] = useState<FilterOptions>({
@@ -26,11 +28,37 @@ const ScholarshipFilter: React.FC<ScholarshipFilterProps> = ({
     sortBy: 'id',
     sortOrder: 'asc'
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleFilterChange = (key: keyof FilterOptions, value: any) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     onFilterChange(newFilters);
+  };
+
+  const handleRefresh = async () => {
+    if (!onRefresh) return;
+    
+    setIsRefreshing(true);
+    try {
+      // Reset filters first
+      const defaultFilters = {
+        showOwned: false,
+        minBalance: '0',
+        minScore: '0',
+        sortBy: 'id' as const,
+        sortOrder: 'asc' as const
+      };
+      setFilters(defaultFilters);
+      onFilterChange(defaultFilters);
+      
+      // Then refresh the data
+      await onRefresh();
+    } catch (error) {
+      console.error('Error refreshing scholarships:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (
@@ -157,25 +185,30 @@ const ScholarshipFilter: React.FC<ScholarshipFilterProps> = ({
           </button>
         </div>
 
-        {/* Reset button */}
+        {/* Refresh button */}
         <button
-          onClick={() => {
-            const defaultFilters = {
-              showOwned: false,
-              minBalance: '0',
-              minScore: '0',
-              sortBy: 'id' as const,
-              sortOrder: 'asc' as const
-            };
-            setFilters(defaultFilters);
-            onFilterChange(defaultFilters);
-          }}
-          className="cursor-pointer ml-auto text-gray-400 hover:text-gray-300 transition-colors"
-          title="Reset filters"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className={`cursor-pointer ml-auto text-gray-400 hover:text-gray-300 transition-colors flex items-center space-x-1 ${
+            isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          title="Reset filters & refresh scholarships"
         >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          {isRefreshing ? (
+            <>
+              <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="text-xs">Refreshing...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="text-xs">Refresh</span>
+            </>
+          )}
         </button>
       </div>
     </div>

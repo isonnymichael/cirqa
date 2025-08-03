@@ -8,6 +8,7 @@ import {
   getScholarshipMetadata,
   getScholarshipOwner,
   getScholarshipScore,
+  getScholarshipData,
   formatCurrency,
   formatAddress,
   handleContractError,
@@ -92,9 +93,8 @@ const ScholarshipList: React.FC = () => {
       const scholarshipDetails = await Promise.all(
         scholarshipIds.map(async (id) => {
           try {
-            const [metadata, owner, score] = await Promise.all([
-              getScholarshipMetadata(id),
-              getScholarshipOwner(id),
+            const [scholarshipData, score] = await Promise.all([
+              retryWithBackoff(() => getScholarshipData(id)),
               retryWithBackoff(() => getScholarshipScore(id)).catch((err) => {
                 console.log(`Score not available for scholarship ${id}:`, err);
                 return BigInt(0);
@@ -103,9 +103,9 @@ const ScholarshipList: React.FC = () => {
 
             return {
               id,
-              student: owner,
-              balance: BigInt(0), // Will be updated with real balance from contract
-              metadata,
+              student: scholarshipData.student,
+              balance: scholarshipData.balance, // Real balance from contract
+              metadata: scholarshipData.metadata,
               score: score || BigInt(0), // Ensure score is never undefined
               exists: true
             };
@@ -260,7 +260,10 @@ const ScholarshipList: React.FC = () => {
     <div>
       {/* Filter Component */}
       <div className="mb-4">
-        <ScholarshipFilter onFilterChange={handleFilterChange} />
+        <ScholarshipFilter 
+          onFilterChange={handleFilterChange} 
+          onRefresh={fetchScholarships}
+        />
       </div>
       
       {/* Results Summary */}
