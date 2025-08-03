@@ -27,8 +27,13 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
     IScoreManager public scoreManager;
 
     // Reward rate for investors (in Cirqa tokens per 1 USDT)
+    // rewardRate = 1e18 means 1:1 ratio (1 CIRQA per 1 USDT) after decimal adjustment
     uint256 public rewardRate = 1e18; // 1 Cirqa token per 1 USDT
     uint256 public protocolFee = 100; // 1% (100 basis points) for 1e4 basis points total (10000)
+    
+    // Token decimals constants for proper calculation
+    uint256 private constant USDT_DECIMALS = 6;
+    uint256 private constant CIRQA_DECIMALS = 18;
 
     event ScholarshipCreated(uint256 indexed tokenId, address indexed student, string metadata);
     event ScholarshipFunded(uint256 indexed tokenId, address indexed investor, uint256 amount);
@@ -102,7 +107,12 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
         scholarshipManager.addFunds(tokenId, amount);
 
         // Calculate and transfer Cirqa rewards to investor
-        uint256 rewardAmount = (amount * rewardRate) / 1e18;
+        // Convert USDT amount (6 decimals) to CIRQA amount (18 decimals) with reward rate
+        // Example: 10 USDT = 10 * 10^6 = 10,000,000 (USDT units)
+        // decimalAdjustment = 10^12 (to convert 6 decimals to 18 decimals)
+        // rewardAmount = (10,000,000 * 10^12 * 1e18) / 1e18 = 10,000,000 * 10^12 = 10 * 10^18 (10 CIRQA)
+        uint256 decimalAdjustment = 10**(CIRQA_DECIMALS - USDT_DECIMALS); // 10^12
+        uint256 rewardAmount = (amount * decimalAdjustment * rewardRate) / 1e18;
         cirqaToken.mint(msg.sender, rewardAmount);
 
         emit ScholarshipFunded(tokenId, msg.sender, amount);
@@ -145,6 +155,8 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
     /**
      * @dev Updates the reward rate for investors (only owner)
      * @param newRate New reward rate (Cirqa tokens per 1 USDT)
+     * @notice rewardRate is used with decimal adjustment: (amount * 10^12 * rewardRate) / 1e18
+     * @notice 1e18 = 1:1 ratio, 2e18 = 2:1 ratio (2 CIRQA per 1 USDT), etc.
      */
     function updateRewardRate(uint256 newRate) external onlyOwner {
         rewardRate = newRate;

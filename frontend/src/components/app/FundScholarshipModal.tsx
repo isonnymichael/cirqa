@@ -180,7 +180,7 @@ const FundScholarshipModal: React.FC<FundScholarshipModalProps> = ({
                 />
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs bg-gray-600 px-2 py-1 rounded text-gray-300 hover:bg-gray-500 transition-colors"
+                  className="cursor-pointer absolute right-2 top-1/2 transform -translate-y-1/2 text-xs bg-gray-600 px-2 py-1 rounded text-gray-300 hover:bg-gray-500 transition-colors"
                   onClick={handleMaxClick}
                   disabled={isLoading || loadingBalance}
                 >
@@ -208,14 +208,14 @@ const FundScholarshipModal: React.FC<FundScholarshipModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors"
+                className="cursor-pointer px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors"
                 disabled={isLoading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600 transition-colors flex items-center justify-center min-w-[80px]"
+                className="cursor-pointer px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600 transition-colors flex items-center justify-center min-w-[80px]"
                 disabled={isLoading || !account || loadingBalance}
               >
                 {isLoading ? <Spinner size="sm" /> : 'Fund'}

@@ -70,6 +70,19 @@ async function main() {
     console.log("Reward Rate:", ethers.formatUnits(rewardRate, 18), "CIRQA per USDT");
     console.log("Protocol Fee:", (Number(protocolFee) / 100).toFixed(2), "%");
 
+    // ============ REWARD CALCULATION DEBUG ============
+    console.log("\n🧮 REWARD CALCULATION DEBUG");
+    console.log("USDT Decimals: 6 (assumed from MockERC20)");
+    console.log("CIRQA Decimals: 18 (standard ERC20)");
+    console.log("Decimal Adjustment: 10^12 (to convert USDT to CIRQA decimals)");
+    console.log("Reward Formula: (usdtAmount * 10^12 * rewardRate) / 1e18");
+    
+    // Example calculation
+    const exampleUSDT = ethers.parseUnits("10", 6); // 10 USDT
+    const decimalAdjustment = BigInt(10) ** BigInt(12);
+    const exampleReward = (exampleUSDT * decimalAdjustment * rewardRate) / BigInt(1e18);
+    console.log(`Example: 10 USDT funding = ${ethers.formatUnits(exampleReward, 18)} CIRQA reward`);
+
     // ============ SCHOLARSHIP STATISTICS ============
     console.log("\n📊 SCHOLARSHIP STATISTICS");
     const totalTokenIds = await core._tokenIds();
