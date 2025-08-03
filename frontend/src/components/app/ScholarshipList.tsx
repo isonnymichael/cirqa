@@ -321,7 +321,7 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
       </div>
       
       {/* Scholarship Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4 md:mb-0">
         {filteredScholarships.map((scholarship) => {
           const metadata = getParsedMetadata(scholarship.metadata, scholarship.id);
           const isOwner = account?.address.toLowerCase() === scholarship.student.toLowerCase();

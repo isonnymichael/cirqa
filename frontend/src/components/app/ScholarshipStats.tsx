@@ -166,65 +166,65 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', ref
   }
 
   return (
-    <div className={`bg-gray-800 rounded-lg border border-gray-700 p-3 ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium flex items-center">
+    <div className={`bg-gray-800 rounded-lg border border-gray-700 p-2 md:p-3 ${className}`}>
+      <div className="flex items-center justify-between mb-2 md:mb-3">
+        <h2 className="text-xs md:text-sm font-medium flex items-center">
           <FaChartLine className="mr-1 text-blue-400 text-xs" />
           Statistics
         </h2>
       </div>
       
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1 md:gap-2">
         {/* Total Scholarships - Integer count with commas */}
-        <div className="bg-blue-900/20 rounded p-2 text-center">
+        <div className="bg-blue-900/20 rounded p-1.5 md:p-2 text-center">
           <FaGraduationCap className="text-blue-400 text-xs mx-auto mb-1" />
-          <div className="text-sm font-bold text-blue-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatInteger(metrics.totalScholarships)}
+          <div className="text-xs md:text-sm font-bold text-blue-400">
+            {metrics.isLoading ? <div className="text-center"><Spinner size="sm" /></div> : formatInteger(metrics.totalScholarships)}
           </div>
           <div className="text-xs text-gray-500">Total</div>
         </div>
         
         {/* Total Funding - USDT amount with 2 decimal places and commas */}
-        <div className="bg-green-900/20 rounded p-2 text-center">
+        <div className="bg-green-900/20 rounded p-1.5 md:p-2 text-center">
           <FaDollarSign className="text-green-400 text-xs mx-auto mb-1" />
-          <div className="text-sm font-bold text-green-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatStatsNumber(metrics.totalFundingAmount, 6, 2)}
+          <div className="text-xs md:text-sm font-bold text-green-400">
+            {metrics.isLoading ? <div className="text-center"><Spinner size="sm" /></div> : formatStatsNumber(metrics.totalFundingAmount, 6, 2)}
           </div>
           <div className="text-xs text-gray-500">Funded</div>
         </div>
         
         {/* Active Scholarships - Integer count with commas */}
-        <div className="bg-purple-900/20 rounded p-2 text-center">
+        <div className="bg-purple-900/20 rounded p-1.5 md:p-2 text-center">
           <FaChartLine className="text-purple-400 text-xs mx-auto mb-1" />
-          <div className="text-sm font-bold text-purple-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatInteger(metrics.activeScholarships)}
+          <div className="text-xs md:text-sm font-bold text-purple-400">
+            {metrics.isLoading ? <div className="text-center"><Spinner size="sm" /></div> : formatInteger(metrics.activeScholarships)}
           </div>
           <div className="text-xs text-gray-500">Active</div>
         </div>
         
         {/* Unique Students - Integer count with commas */}
-        <div className="bg-orange-900/20 rounded p-2 text-center">
+        <div className="bg-orange-900/20 rounded p-1.5 md:p-2 text-center">
           <FaUsers className="text-orange-400 text-xs mx-auto mb-1" />
-          <div className="text-sm font-bold text-orange-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatInteger(metrics.studentsCount)}
+          <div className="text-xs md:text-sm font-bold text-orange-400">
+            {metrics.isLoading ? <div className="text-center"><Spinner size="sm" /></div> : formatInteger(metrics.studentsCount)}
           </div>
           <div className="text-xs text-gray-500">Students</div>
         </div>
 
         {/* Total Withdrawn - USDT amount with 2 decimal places and commas */}
-        <div className="bg-yellow-900/20 rounded p-2 text-center">
+        <div className="bg-yellow-900/20 rounded p-1.5 md:p-2 text-center">
           <FaDollarSign className="text-yellow-400 text-xs mx-auto mb-1" />
-          <div className="text-sm font-bold text-yellow-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatStatsNumber(metrics.totalWithdrawals, 6, 2)}
+          <div className="text-xs md:text-sm font-bold text-yellow-400">
+            {metrics.isLoading ? <div className="text-center"><Spinner size="sm" /></div> : formatStatsNumber(metrics.totalWithdrawals, 6, 2)}
           </div>
           <div className="text-xs text-gray-500">Withdrawn</div>
         </div>
         
         {/* Available Balance - USDT amount with 2 decimal places and commas */}
-        <div className="bg-emerald-900/20 rounded p-2 text-center">
+        <div className="bg-emerald-900/20 rounded p-1.5 md:p-2 text-center">
           <FaDollarSign className="text-emerald-400 text-xs mx-auto mb-1" />
-          <div className="text-sm font-bold text-emerald-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatStatsNumber(metrics.totalFundingAmount - metrics.totalWithdrawals, 6, 2)}
+          <div className="text-xs md:text-sm font-bold text-emerald-400">
+            {metrics.isLoading ? <div className="text-center"><Spinner size="sm" /></div> : formatStatsNumber(metrics.totalFundingAmount - metrics.totalWithdrawals, 6, 2)}
           </div>
           <div className="text-xs text-gray-500">Available</div>
         </div>

@@ -95,25 +95,23 @@ const NotificationBanner: React.FC<NotificationBannerProps> = ({
   };
 
   return (
-    <div className={`rounded-lg border px-4 py-3 ${getTypeStyles()} ${className}`}>
-      <div className="flex items-start">
-        {showIcon && <div className="flex-shrink-0 mr-3">{getIcon()}</div>}
-        <div className="flex-1">
-          <p className="text-sm">{message}</p>
+    <div className={`rounded-lg mt-4 border px-3 md:px-4 py-2 md:py-3 ${getTypeStyles()} ${className}`}>
+      <div className="flex items-start gap-2 md:gap-3">
+        {showIcon && <div className="flex-shrink-0">{getIcon()}</div>}
+        <div className="flex-1 min-w-0">
+          <p className="text-xs md:text-sm break-words">{message}</p>
         </div>
         {dismissible && (
-          <div className="ml-auto pl-3">
-            <div className="-mx-1.5 -my-1.5">
-              <button
-                onClick={handleDismiss}
-                className="inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800"
-              >
-                <span className="sr-only">Dismiss</span>
-                <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
+          <div className="flex-shrink-0">
+            <button
+              onClick={handleDismiss}
+              className="cursor-pointer inline-flex rounded-md p-1 md:p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 hover:bg-black/20 transition-colors"
+            >
+              <span className="sr-only">Dismiss</span>
+              <svg className="h-3 w-3 md:h-4 md:w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
           </div>
         )}
       </div>

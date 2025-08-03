@@ -222,19 +222,19 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
 
   if (error || !scholarship) {
     return (
-      <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-center">
-        <div className="text-red-500 text-xl mb-2">⚠</div>
-        <p className="text-red-400 mb-4">{error || 'Scholarship not found'}</p>
-        <div className="flex justify-center mt-4 space-x-3">
+      <div className="bg-red-900/20 border border-red-800 rounded-lg p-3 md:p-4 text-center">
+        <div className="text-red-500 text-lg md:text-xl mb-2">⚠</div>
+        <p className="text-red-400 mb-3 md:mb-4 text-sm md:text-base">{error || 'Scholarship not found'}</p>
+        <div className="flex flex-col sm:flex-row justify-center mt-3 md:mt-4 gap-2 sm:gap-3">
           <button 
             onClick={handleRetry}
-            className="cursor-pointer px-4 py-2 bg-red-700 text-white rounded-md hover:bg-red-800 transition-colors"
+            className="cursor-pointer px-3 md:px-4 py-2 bg-red-700 text-white rounded-md hover:bg-red-800 transition-colors text-sm md:text-base"
           >
             Try Again
           </button>
           <button 
             onClick={onClose}
-            className="cursor-pointer px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors"
+            className="cursor-pointer px-3 md:px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors text-sm md:text-base"
           >
             Close
           </button>
@@ -568,16 +568,16 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
       </div>
 
       {/* Action Buttons */}
-      <div className="flex justify-between items-center">
-        <div className="text-xs text-gray-500">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-center lg:space-y-0">
+        <div className="text-xs text-gray-500 order-2 lg:order-1 text-center lg:text-left">
           Last updated: {new Date().toLocaleString()}
         </div>
-                <div className="flex items-center space-x-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3 order-1 lg:order-2">
           {/* Fund Button - Show if not owner */}
           {!isOwner && (
             <button
               onClick={() => setShowFundModal(true)}
-              className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+              className="cursor-pointer px-3 md:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm md:text-base w-full sm:w-auto"
             >
               💰 Fund Scholarship
             </button>
@@ -587,7 +587,7 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
           {!isOwner && account && cirqaBalance >= minRatingTokens && (
             <button
               onClick={() => setShowRatingModal(true)}
-              className="cursor-pointer px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm"
+              className="cursor-pointer px-3 md:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm md:text-base w-full sm:w-auto"
             >
               ⭐ {investorRating ? 'Update Rating' : 'Rate Student'}
             </button>
@@ -595,7 +595,7 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
           
           {/* Show CIRQA requirement if user can't rate */}
           {!isOwner && account && cirqaBalance < minRatingTokens && minRatingTokens > BigInt(0) && (
-            <div className="text-xs text-yellow-400 bg-yellow-900/20 px-3 py-2 rounded">
+            <div className="text-xs md:text-sm text-yellow-400 bg-yellow-900/20 px-3 py-2 rounded text-center sm:text-left">
               Need {formatCurrency(minRatingTokens, 18, '', 0)} CIRQA to rate
             </div>
           )}
@@ -604,24 +604,24 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
           {isOwner && scholarship.balance > BigInt(0) && (
             <button
               onClick={() => setShowWithdrawModal(true)}
-              className="cursor-pointer px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+              className="cursor-pointer px-3 md:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm md:text-base w-full sm:w-auto"
             >
               💸 Withdraw Funds
             </button>
           )}
           
-        <button
-          onClick={onClose}
-            className="cursor-pointer px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors text-sm"
-        >
+          <button
+            onClick={onClose}
+            className="cursor-pointer px-3 md:px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors text-sm md:text-base w-full sm:w-auto"
+          >
             Close Details
-        </button>
+          </button>
         </div>
       </div>
 
       {/* Image Preview Modal */}
       {showImagePreview && parsedMetadata?.image && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowImagePreview(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowImagePreview(false)}>
           <div className="max-w-4xl max-h-4xl p-4">
             <img
               src={parsedMetadata.image}

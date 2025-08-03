@@ -141,36 +141,36 @@ const RatingModal: React.FC<RatingModalProps> = ({
 
   if (step === 'confirm') {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-700">
-          <h3 className="text-xl font-bold mb-4 text-center">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-gray-800 rounded-lg p-4 md:p-6 max-w-md w-full border border-gray-700 my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <h3 className="text-lg md:text-xl font-bold mb-3 md:mb-4 text-center">
             {currentRating ? 'Update Rating' : 'Confirm Rating'}
           </h3>
           
-          <div className="bg-gray-700/30 rounded-lg p-4 mb-6">
-            <div className="text-center mb-4">
-              <p className="text-gray-400 text-sm mb-2">Rating for</p>
-              <p className="font-semibold text-white">{studentName}</p>
+          <div className="bg-gray-700/30 rounded-lg p-3 md:p-4 mb-4 md:mb-6">
+            <div className="text-center mb-3 md:mb-4">
+              <p className="text-gray-400 text-xs md:text-sm mb-2">Rating for</p>
+              <p className="font-semibold text-white text-sm md:text-base">{studentName}</p>
             </div>
             
-            <div className="flex items-center justify-center space-x-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-3 md:mb-4">
               <div className="text-center">
-                <p className="text-gray-400 text-sm">Score</p>
+                <p className="text-gray-400 text-xs md:text-sm">Score</p>
                 <div className="flex items-center space-x-1">
-                  <span className="text-2xl font-bold text-yellow-400">{score}</span>
+                  <span className="text-xl md:text-2xl font-bold text-yellow-400">{score}</span>
                   <span className="text-yellow-400">⭐</span>
                 </div>
               </div>
               
               <div className="text-center">
-                <p className="text-gray-400 text-sm">CIRQA Amount</p>
-                <p className="text-lg font-semibold text-blue-400">
+                <p className="text-gray-400 text-xs md:text-sm">CIRQA Amount</p>
+                <p className="text-base md:text-lg font-semibold text-blue-400">
                   {tokenAmount} CIRQA
                 </p>
               </div>
             </div>
             
-            <div className="border-t border-gray-600 pt-3">
+            <div className="border-t border-gray-600 pt-2 md:pt-3">
               <p className="text-xs text-gray-400 text-center">
                 {currentRating ? 'This will update your previous rating' : 'Your tokens will be used to weight this rating'}
               </p>
@@ -178,29 +178,29 @@ const RatingModal: React.FC<RatingModalProps> = ({
           </div>
           
           {error && (
-            <div className="bg-red-900/20 border border-red-800 rounded p-3 mb-4">
-              <p className="text-red-400 text-sm">{error}</p>
+            <div className="bg-red-900/20 border border-red-800 rounded p-2 md:p-3 mb-3 md:mb-4">
+              <p className="text-red-400 text-xs md:text-sm break-words">{error}</p>
             </div>
           )}
           
-          <div className="flex space-x-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <button
               onClick={handleBack}
               disabled={loading}
-              className="cursor-pointer flex-1 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors disabled:opacity-50"
+              className="cursor-pointer flex-1 px-3 md:px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors disabled:opacity-50 text-sm md:text-base"
             >
               ← Back
             </button>
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="cursor-pointer flex-1 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+              className="cursor-pointer flex-1 px-3 md:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors disabled:opacity-50 flex items-center justify-center text-sm md:text-base"
             >
               {loading ? (
-                <>
+                <div className="text-center">
                   <Spinner size="sm" />
                   <span className="ml-2">Rating...</span>
-                </>
+                </div>
               ) : (
                 `⭐ ${currentRating ? 'Update' : 'Submit'} Rating`
               )}
@@ -212,10 +212,10 @@ const RatingModal: React.FC<RatingModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-700">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="text-xl font-bold">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-gray-800 rounded-lg p-4 md:p-6 max-w-md w-full border border-gray-700 my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="flex justify-between items-start mb-3 md:mb-4">
+          <h3 className="text-lg md:text-xl font-bold">
             {currentRating ? 'Update Rating' : 'Rate Student'}
           </h3>
           <button
@@ -238,7 +238,7 @@ const RatingModal: React.FC<RatingModalProps> = ({
           <label className="block text-sm font-medium text-gray-300 mb-3">
             Score (1-10) - Select a rating
           </label>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-10 gap-1">
             {starRating.map((rating) => {
               const canAfford = canAffordRating(rating);
               const isSelected = score === rating;
@@ -254,7 +254,7 @@ const RatingModal: React.FC<RatingModalProps> = ({
                       ? `Need ${formatCurrency(requiredTokens, 18, '', 2)} CIRQA` 
                       : `Requires ${formatCurrency(requiredTokens, 18, '', 2)} CIRQA`
                   }
-                  className={`aspect-square rounded-lg border-2 transition-all text-sm font-bold ${
+                  className={`aspect-square rounded-lg border-2 transition-all text-xs font-bold ${
                     isSelected
                       ? 'border-yellow-400 bg-yellow-400/20 text-yellow-400'
                       : canAfford
@@ -270,7 +270,7 @@ const RatingModal: React.FC<RatingModalProps> = ({
           <div className="flex justify-center mt-2">
             {score !== null ? (
               <div className="flex items-center space-x-1">
-                <span className="text-2xl font-bold text-yellow-400">{score}</span>
+                <span className="text-xl md:text-2xl font-bold text-yellow-400">{score}</span>
                 <span className="text-yellow-400">⭐</span>
               </div>
             ) : (
@@ -296,7 +296,7 @@ const RatingModal: React.FC<RatingModalProps> = ({
               CIRQA
             </div>
           </div>
-          <div className="flex justify-between items-center mt-2 text-xs">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0 mt-2 text-xs md:text-sm">
             <span className="text-gray-400">
               Min: {formatCurrency(minRatingTokens, 18, '', 0)} CIRQA
             </span>
@@ -305,7 +305,7 @@ const RatingModal: React.FC<RatingModalProps> = ({
             </span>
           </div>
           {score !== null && (
-            <div className="mt-2 p-2 bg-blue-900/20 border border-blue-800 rounded text-xs text-blue-300">
+            <div className="mt-2 p-2 bg-blue-900/20 border border-blue-800 rounded text-xs md:text-sm text-blue-300">
               💡 Rating {score}/10 requires {formatCurrency(calculateRequiredTokens(score), 18, '', 2)} CIRQA tokens
             </div>
           )}
@@ -314,10 +314,10 @@ const RatingModal: React.FC<RatingModalProps> = ({
         {/* Current Rating Info */}
         {currentRating && (
           <div className="mb-6 bg-blue-900/20 border border-blue-800 rounded-lg p-3">
-            <p className="text-blue-400 text-sm font-medium mb-2">Current Rating:</p>
+            <p className="text-blue-400 text-sm md:text-base font-medium mb-2">Current Rating:</p>
             <div className="flex items-center justify-between">
-              <span className="text-blue-300">{currentRating.score}/10 ⭐</span>
-              <span className="text-blue-300 text-sm">
+              <span className="text-blue-300 text-sm md:text-base">{currentRating.score}/10 ⭐</span>
+              <span className="text-blue-300 text-xs md:text-sm">
                 {formatCurrency(currentRating.tokens, 18, '', 2)} CIRQA
               </span>
             </div>
@@ -327,13 +327,13 @@ const RatingModal: React.FC<RatingModalProps> = ({
         {/* Error Display */}
         {error && (
           <div className="mb-4 bg-red-900/20 border border-red-800 rounded p-3">
-            <p className="text-red-400 text-sm">{error}</p>
+            <p className="text-red-400 text-sm md:text-base break-words">{error}</p>
           </div>
         )}
 
         {/* Info */}
         <div className="mb-6 bg-gray-700/30 rounded-lg p-3">
-          <p className="text-gray-400 text-xs leading-relaxed">
+          <p className="text-gray-400 text-xs md:text-sm leading-relaxed">
             • Higher ratings require more CIRQA tokens<br/>
             • Rating 1-3: 1x requirement, 4-6: 2x, 7-8: 3x, 9-10: 5x<br/>
             • Higher token amounts give your rating more weight<br/>
@@ -341,17 +341,17 @@ const RatingModal: React.FC<RatingModalProps> = ({
           </p>
         </div>
         
-        <div className="flex space-x-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <button
             onClick={onClose}
-            className="cursor-pointer flex-1 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors"
+            className="cursor-pointer flex-1 px-3 md:px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors text-sm md:text-base"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={!isFormValid()}
-            className="cursor-pointer flex-1 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="cursor-pointer flex-1 px-3 md:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
           >
             {score === null ? 'Select Rating First' : 'Continue →'}
           </button>

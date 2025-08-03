@@ -16,7 +16,7 @@ const Footer = () => {
           </div>
 
           {/* Resources dan Community - di kanan dan text-nya rata kanan */}
-          <div className="md:w-1/2 md:flex md:justify-end md:gap-12 text-right">
+          <div className="md:w-1/2 flex justify-end gap-12 text-right">
 
             <div>
               <h4 className="text-lg font-bold mb-4">Resources</h4>
