@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "deploy": "npx hardhat ignition deploy ignition/modules/Deploy.ts --network kiiTestnet",
+    "contract-info": "npx hardhat run ignition/modules/ContractInfo.ts --network kiiTestnet",
+    "scholarships-info": "npx hardhat run ignition/modules/ScholarshipsInfo.ts --network kiiTestnet"
   },
   "keywords": [],
   "author": "",

@@ -120,6 +120,13 @@ async function main() {
         
         // Try to get decimals (might fail for some tokens)
         let decimals = 6;
+        try {
+          // Cast to any to access decimals function that might not be in interface
+          const decimalsCall = await (usdtToken as any).decimals();
+          decimals = Number(decimalsCall);
+        } catch (e) {
+          console.log("Could not get USDT decimals, assuming 6");
+        }
         
         console.log("Core Contract USDT Balance:", ethers.formatUnits(coreUsdtBalance, decimals));
         console.log("USDT Decimals:", decimals);
