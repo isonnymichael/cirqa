@@ -28,6 +28,15 @@ export type {
     TransferTokenParams
 } from './tokenHelpers';
 
+// Additional exports for new allowance management functions
+export {
+    getCirqaAllowance,
+    needsUSDTApproval,
+    needsCirqaApproval,
+    ensureUSDTApproval,
+    ensureCirqaApproval
+} from './tokenHelpers';
+
 export type {
     UpdateRewardRateParams,
     UpdateProtocolFeeParams,

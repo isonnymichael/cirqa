@@ -1,7 +1,7 @@
-import { PreparedTransaction, getContract, prepareContractCall, sendTransaction, readContract } from 'thirdweb';
+import { PreparedTransaction, getContract, prepareContractCall, sendTransaction, readContract, waitForReceipt } from 'thirdweb';
 import { Account } from 'thirdweb/wallets';
 import { MaxUint256 } from 'ethers';
-import { cirqaCore, cirqaTokenContract, usdtTokenContract, scholarshipManagerContract } from '@/lib/contracts';
+import { cirqaCore, cirqaTokenContract, usdtTokenContract, scholarshipManagerContract, client, chain } from '@/lib/contracts';
 
 // Types for scholarship data
 export interface ScholarshipData {
@@ -33,6 +33,42 @@ export interface WithdrawFundsParams {
     tokenId: number;
     amount: bigint;
     account: Account;
+}
+
+/**
+ * Utility function to sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry function with exponential backoff
+ */
+async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+): Promise<T> {
+    let lastError: Error;
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error as Error;
+            
+            if (i === maxRetries - 1) {
+                throw lastError;
+            }
+            
+            const delay = baseDelay * Math.pow(2, i);
+            console.log(`Attempt ${i + 1} failed, retrying in ${delay}ms...`);
+            await sleep(delay);
+        }
+    }
+    
+    throw lastError!;
 }
 
 /**
@@ -85,45 +121,132 @@ export async function fundScholarship(params: FundScholarshipParams): Promise<st
     try {
         const { tokenId, amount, account } = params;
 
+        console.log('🎯 Starting fund scholarship process...');
+        console.log('   Account:', account.address);
+        console.log('   Token ID:', tokenId);
+        console.log('   Amount:', amount.toString());
+
         // First, check if we need to approve USDT spending
+        console.log('🔍 Checking current USDT allowance...');
         const currentAllowance = await readContract({
             contract: usdtTokenContract,
             method: "function allowance(address owner, address spender) view returns (uint256)",
             params: [account.address, cirqaCore.address]
         });
 
+        console.log('📊 Current allowance:', currentAllowance.toString());
+        console.log('📊 Required amount:', amount.toString());
+
         // If allowance is insufficient, approve unlimited amount
         if (currentAllowance < amount) {
+            console.log('🔄 Current allowance insufficient, requesting unlimited approval...');
+            
             const approveTransaction = prepareContractCall({
                 contract: usdtTokenContract,
                 method: "function approve(address spender, uint256 amount) returns (bool)",
                 params: [cirqaCore.address, MaxUint256]
             });
 
-            await sendTransaction({
+            const approvalResult = await sendTransaction({
                 transaction: approveTransaction,
                 account
             });
             
-            console.log('✅ USDT unlimited approval granted for Core contract');
+            console.log('⏳ Waiting for approval transaction to be confirmed...');
+            
+            try {
+                // Wait for the approval transaction to be confirmed
+                await waitForReceipt({
+                    client,
+                    chain,
+                    transactionHash: approvalResult.transactionHash
+                });
+                
+                console.log('✅ USDT unlimited approval confirmed on blockchain');
+            } catch (receiptError) {
+                console.warn('⚠️ Could not wait for receipt, but transaction was sent. Adding delay...');
+                // Fallback: add a fixed delay to allow blockchain to process
+                await sleep(3000); // 3 second delay
+            }
+            
+            // Double-check the allowance is actually updated with retry mechanism
+            console.log('🔄 Verifying allowance update...');
+            const updatedAllowance = await retryWithBackoff(async () => {
+                const allowance = await readContract({
+                    contract: usdtTokenContract,
+                    method: "function allowance(address owner, address spender) view returns (uint256)",
+                    params: [account.address, cirqaCore.address]
+                });
+                
+                if (allowance < amount) {
+                    throw new Error(`Allowance still insufficient: ${allowance.toString()} < ${amount.toString()}`);
+                }
+                
+                return allowance;
+            }, 5, 1000); // 5 retries with 1s base delay
+            
+            console.log('✅ Updated allowance verified:', updatedAllowance.toString());
         }
 
+        // Final allowance check before funding
+        console.log('🔍 Final allowance verification before funding...');
+        const finalAllowance = await readContract({
+            contract: usdtTokenContract,
+            method: "function allowance(address owner, address spender) view returns (uint256)",
+            params: [account.address, cirqaCore.address]
+        });
+        
+        if (finalAllowance < amount) {
+            throw new Error(`Final allowance check failed: ${finalAllowance.toString()} < ${amount.toString()}`);
+        }
+        
+        console.log('✅ Final allowance check passed:', finalAllowance.toString());
+
         // Now fund the scholarship
+        console.log('🎯 Preparing fund transaction...');
+        console.log('   Token ID:', tokenId);
+        console.log('   Amount:', amount.toString());
+        
         const fundTransaction = prepareContractCall({
             contract: cirqaCore,
             method: "function fundScholarship(uint256 tokenId, uint256 amount) external",
             params: [BigInt(tokenId), amount]
         });
 
-        const result = await sendTransaction({
-            transaction: fundTransaction,
-            account
-        });
+        console.log('📤 Sending fund transaction...');
+        
+        // Use retry mechanism for the fund transaction
+        const result = await retryWithBackoff(async () => {
+            return await sendTransaction({
+                transaction: fundTransaction,
+                account
+            });
+        }, 3, 1500); // 3 retries with 1.5s base delay
 
+        console.log('✅ Fund transaction sent successfully:', result.transactionHash);
         return result.transactionHash;
     } catch (error) {
-        console.error('Error funding scholarship:', error);
-        throw new Error(`Failed to fund scholarship: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('❌ Error funding scholarship:', error);
+        
+        // Enhanced error handling with specific error types
+        if (error instanceof Error) {
+            // Check for specific error patterns
+            if (error.message.includes('0xfb8f41b2')) {
+                throw new Error('Transaction failed - this usually means insufficient allowance or the approval transaction is still pending. Please wait a moment and try again.');
+            } else if (error.message.includes('insufficient funds')) {
+                throw new Error('Insufficient USDT balance to fund this scholarship.');
+            } else if (error.message.includes('user rejected')) {
+                throw new Error('Transaction was rejected by user.');
+            } else if (error.message.includes('Scholarship does not exist')) {
+                throw new Error('This scholarship does not exist.');
+            } else if (error.message.includes('Amount must be greater than 0')) {
+                throw new Error('Funding amount must be greater than 0.');
+            } else {
+                throw new Error(`Failed to fund scholarship: ${error.message}`);
+            }
+        } else {
+            throw new Error('Failed to fund scholarship: Unknown error occurred');
+        }
     }
 }
 

@@ -2,9 +2,11 @@ import { getContract } from 'thirdweb';
 import { createThirdwebClient } from 'thirdweb';
 import { kiiTestnet } from './chain';
 
-const client = createThirdwebClient({
+export const client = createThirdwebClient({
     clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID!,
 });
+
+export const chain = kiiTestnet;
 
 export const CIRQA_TOKEN_ADDRESS = process.env.NEXT_PUBLIC_CIRQA_TOKEN_ADDRESS!;
 export const USDT_TOKEN_ADDRESS = process.env.NEXT_PUBLIC_USDT_TOKEN_ADDRESS!;

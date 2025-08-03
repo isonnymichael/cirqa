@@ -1,7 +1,7 @@
-import { prepareContractCall, sendTransaction, readContract, getContract } from 'thirdweb';
+import { prepareContractCall, sendTransaction, readContract, getContract, waitForReceipt } from 'thirdweb';
 import { Account } from 'thirdweb/wallets';
 import { MaxUint256 } from 'ethers';
-import { cirqaCore, scoreManagerContract, cirqaTokenContract } from '@/lib/contracts';
+import { cirqaCore, scoreManagerContract, cirqaTokenContract, client, chain } from '@/lib/contracts';
 
 // Types for score operations
 export interface UpdateScoreParams {
@@ -21,6 +21,42 @@ export interface InvestorRating {
     score: number;
     tokens: bigint;
     timestamp: bigint;
+}
+
+/**
+ * Utility function to sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry function with exponential backoff
+ */
+async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+): Promise<T> {
+    let lastError: Error;
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error as Error;
+            
+            if (i === maxRetries - 1) {
+                throw lastError;
+            }
+            
+            const delay = baseDelay * Math.pow(2, i);
+            console.log(`Attempt ${i + 1} failed, retrying in ${delay}ms...`);
+            await sleep(delay);
+        }
+    }
+    
+    throw lastError!;
 }
 
 /**
@@ -96,50 +132,135 @@ export async function rateScholarship(params: RateScholarshipParams): Promise<st
     try {
         const { tokenId, score, amount, account } = params;
 
+        console.log('🎯 Starting scholarship rating process...');
+        console.log('   Account:', account.address);
+        console.log('   Token ID:', tokenId);
+        console.log('   Score:', score);
+        console.log('   Amount:', amount.toString());
+
         // Validate score range
         if (score < 1 || score > 10) {
             throw new Error('Score must be between 1 and 10');
         }
 
         // First, check if we need to approve Cirqa token spending
+        console.log('🔍 Checking current CIRQA allowance for ScoreManager...');
         const currentAllowance = await readContract({
             contract: cirqaTokenContract,
             method: "function allowance(address owner, address spender) view returns (uint256)",
             params: [account.address, scoreManagerContract.address]
         });
 
+        console.log('📊 Current allowance:', currentAllowance.toString());
+        console.log('📊 Required amount:', amount.toString());
+
         // If allowance is insufficient, approve unlimited amount
         if (currentAllowance < amount) {
+            console.log('🔄 Current allowance insufficient, requesting unlimited approval...');
+            
             const approveTransaction = prepareContractCall({
                 contract: cirqaTokenContract,
                 method: "function approve(address spender, uint256 amount) returns (bool)",
                 params: [scoreManagerContract.address, MaxUint256]
             });
 
-            await sendTransaction({
+            const approvalResult = await sendTransaction({
                 transaction: approveTransaction,
                 account
             });
             
-            console.log('✅ Cirqa token unlimited approval granted for ScoreManager contract');
+            console.log('⏳ Waiting for CIRQA approval transaction to be confirmed...');
+            
+            try {
+                // Wait for the approval transaction to be confirmed
+                await waitForReceipt({
+                    client,
+                    chain,
+                    transactionHash: approvalResult.transactionHash
+                });
+                
+                console.log('✅ CIRQA unlimited approval confirmed on blockchain');
+            } catch (receiptError) {
+                console.warn('⚠️ Could not wait for receipt, but transaction was sent. Adding delay...');
+                // Fallback: add a fixed delay to allow blockchain to process
+                await sleep(3000); // 3 second delay
+            }
+            
+            // Double-check the allowance is actually updated with retry mechanism
+            console.log('🔄 Verifying CIRQA allowance update...');
+            const updatedAllowance = await retryWithBackoff(async () => {
+                const allowance = await readContract({
+                    contract: cirqaTokenContract,
+                    method: "function allowance(address owner, address spender) view returns (uint256)",
+                    params: [account.address, scoreManagerContract.address]
+                });
+                
+                if (allowance < amount) {
+                    throw new Error(`CIRQA allowance still insufficient: ${allowance.toString()} < ${amount.toString()}`);
+                }
+                
+                return allowance;
+            }, 5, 1000); // 5 retries with 1s base delay
+            
+            console.log('✅ CIRQA allowance verified:', updatedAllowance.toString());
         }
 
+        // Final allowance check before rating
+        console.log('🔍 Final allowance verification before rating...');
+        const finalAllowance = await readContract({
+            contract: cirqaTokenContract,
+            method: "function allowance(address owner, address spender) view returns (uint256)",
+            params: [account.address, scoreManagerContract.address]
+        });
+        
+        if (finalAllowance < amount) {
+            throw new Error(`Final allowance check failed: ${finalAllowance.toString()} < ${amount.toString()}`);
+        }
+        
+        console.log('✅ Final allowance check passed:', finalAllowance.toString());
+
         // Now rate the scholarship
+        console.log('🎯 Preparing rating transaction...');
         const rateTransaction = prepareContractCall({
             contract: scoreManagerContract,
             method: "function rateScholarship(uint256 tokenId, uint8 score, uint256 amount) external",
             params: [BigInt(tokenId), score, amount]
         });
 
-        const result = await sendTransaction({
-            transaction: rateTransaction,
-            account
-        });
+        console.log('📤 Sending rating transaction...');
+        
+        // Use retry mechanism for the rating transaction
+        const result = await retryWithBackoff(async () => {
+            return await sendTransaction({
+                transaction: rateTransaction,
+                account
+            });
+        }, 3, 1500); // 3 retries with 1.5s base delay
 
+        console.log('✅ Rating transaction sent successfully:', result.transactionHash);
         return result.transactionHash;
     } catch (error) {
-        console.error('Error rating scholarship:', error);
-        throw new Error(`Failed to rate scholarship: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('❌ Error rating scholarship:', error);
+        
+        // Enhanced error handling with specific error types
+        if (error instanceof Error) {
+            // Check for specific error patterns
+            if (error.message.includes('0xfb8f41b2')) {
+                throw new Error('Rating failed - this usually means insufficient CIRQA allowance or the approval transaction is still pending. Please wait a moment and try again.');
+            } else if (error.message.includes('insufficient funds')) {
+                throw new Error('Insufficient CIRQA balance to rate this scholarship.');
+            } else if (error.message.includes('user rejected')) {
+                throw new Error('Transaction was rejected by user.');
+            } else if (error.message.includes('Score must be between 1 and 10')) {
+                throw new Error('Score must be between 1 and 10.');
+            } else if (error.message.includes('Scholarship does not exist')) {
+                throw new Error('This scholarship does not exist.');
+            } else {
+                throw new Error(`Failed to rate scholarship: ${error.message}`);
+            }
+        } else {
+            throw new Error('Failed to rate scholarship: Unknown error occurred');
+        }
     }
 }
 

@@ -1,7 +1,7 @@
-import { prepareContractCall, sendTransaction, readContract } from 'thirdweb';
+import { prepareContractCall, sendTransaction, readContract, waitForReceipt } from 'thirdweb';
 import { Account } from 'thirdweb/wallets';
 import { MaxUint256 } from 'ethers';
-import { cirqaTokenContract, usdtTokenContract, cirqaCore } from '@/lib/contracts';
+import { cirqaTokenContract, usdtTokenContract, cirqaCore, client, chain } from '@/lib/contracts';
 
 // Types for token operations
 export interface ApproveTokenParams {
@@ -20,6 +20,42 @@ export interface TokenBalance {
     decimals: number;
     symbol: string;
     name: string;
+}
+
+/**
+ * Utility function to sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry function with exponential backoff
+ */
+async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+): Promise<T> {
+    let lastError: Error;
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error as Error;
+            
+            if (i === maxRetries - 1) {
+                throw lastError;
+            }
+            
+            const delay = baseDelay * Math.pow(2, i);
+            console.log(`Attempt ${i + 1} failed, retrying in ${delay}ms...`);
+            await sleep(delay);
+        }
+    }
+    
+    throw lastError!;
 }
 
 /**
@@ -83,6 +119,10 @@ export async function approveUSDT(params: { account: Account }): Promise<string>
     try {
         const { account } = params;
 
+        console.log('🔄 Requesting USDT unlimited approval...');
+        console.log('   Account:', account.address);
+        console.log('   Spender:', cirqaCore.address);
+
         const transaction = prepareContractCall({
             contract: usdtTokenContract,
             method: "function approve(address spender, uint256 amount) returns (bool)",
@@ -94,10 +134,23 @@ export async function approveUSDT(params: { account: Account }): Promise<string>
             account
         });
 
+        console.log('✅ USDT approval transaction sent:', result.transactionHash);
         return result.transactionHash;
     } catch (error) {
-        console.error('Error approving USDT:', error);
-        throw new Error(`Failed to approve USDT: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('❌ Error approving USDT:', error);
+        
+        // Enhanced error handling
+        if (error instanceof Error) {
+            if (error.message.includes('user rejected')) {
+                throw new Error('USDT approval was rejected by user.');
+            } else if (error.message.includes('insufficient funds')) {
+                throw new Error('Insufficient ETH balance for approval transaction.');
+            } else {
+                throw new Error(`Failed to approve USDT: ${error.message}`);
+            }
+        } else {
+            throw new Error('Failed to approve USDT: Unknown error occurred');
+        }
     }
 }
 
@@ -107,6 +160,10 @@ export async function approveUSDT(params: { account: Account }): Promise<string>
 export async function approveCirqa(params: { account: Account }): Promise<string> {
     try {
         const { account } = params;
+
+        console.log('🔄 Requesting CIRQA unlimited approval...');
+        console.log('   Account:', account.address);
+        console.log('   Spender:', cirqaCore.address);
 
         const transaction = prepareContractCall({
             contract: cirqaTokenContract,
@@ -119,10 +176,41 @@ export async function approveCirqa(params: { account: Account }): Promise<string
             account
         });
 
+        console.log('✅ CIRQA approval transaction sent:', result.transactionHash);
         return result.transactionHash;
     } catch (error) {
-        console.error('Error approving Cirqa:', error);
-        throw new Error(`Failed to approve Cirqa: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('❌ Error approving CIRQA:', error);
+        
+        // Enhanced error handling
+        if (error instanceof Error) {
+            if (error.message.includes('user rejected')) {
+                throw new Error('CIRQA approval was rejected by user.');
+            } else if (error.message.includes('insufficient funds')) {
+                throw new Error('Insufficient ETH balance for approval transaction.');
+            } else {
+                throw new Error(`Failed to approve CIRQA: ${error.message}`);
+            }
+        } else {
+            throw new Error('Failed to approve CIRQA: Unknown error occurred');
+        }
+    }
+}
+
+/**
+ * Get Cirqa allowance for Core contract or ScoreManager
+ */
+export async function getCirqaAllowance(owner: string, spender: string): Promise<bigint> {
+    try {
+        const allowance = await readContract({
+            contract: cirqaTokenContract,
+            method: "function allowance(address owner, address spender) view returns (uint256)",
+            params: [owner, spender]
+        });
+
+        return allowance;
+    } catch (error) {
+        console.error('Error getting Cirqa allowance:', error);
+        throw new Error(`Failed to get Cirqa allowance: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
 
@@ -142,6 +230,21 @@ export async function needsUSDTApproval(owner: string, requiredAmount: bigint): 
 }
 
 /**
+ * Check if unlimited approval is needed for Cirqa
+ */
+export async function needsCirqaApproval(owner: string, spender: string, requiredAmount: bigint): Promise<boolean> {
+    try {
+        const allowance = await getCirqaAllowance(owner, spender);
+        // Consider approval needed if allowance is less than required amount
+        // or if allowance is significantly less than MaxUint256 (to handle potential precision issues)
+        return allowance < requiredAmount || allowance < (MaxUint256 / BigInt(2));
+    } catch (error) {
+        console.error('Error checking Cirqa approval needs:', error);
+        return true; // Default to requiring approval if check fails
+    }
+}
+
+/**
  * Auto-approve USDT if needed for a specific amount
  * Returns true if approval was successful or not needed
  */
@@ -149,13 +252,57 @@ export async function ensureUSDTApproval(params: { account: Account; requiredAmo
     try {
         const { account, requiredAmount } = params;
         
+        console.log('🔍 Checking USDT approval requirements...');
+        console.log('   Account:', account.address);
+        console.log('   Required amount:', requiredAmount.toString());
+        
         // Check if approval is needed
         const needsApproval = await needsUSDTApproval(account.address, requiredAmount);
         
         if (needsApproval) {
             console.log('🔄 USDT approval needed, requesting unlimited approval...');
-            await approveUSDT({ account });
-            console.log('✅ USDT unlimited approval granted successfully');
+            
+            const approveTransaction = prepareContractCall({
+                contract: usdtTokenContract,
+                method: "function approve(address spender, uint256 amount) returns (bool)",
+                params: [cirqaCore.address, MaxUint256]
+            });
+
+            const approvalResult = await sendTransaction({
+                transaction: approveTransaction,
+                account
+            });
+            
+            console.log('⏳ Waiting for USDT approval transaction to be confirmed...');
+            
+            try {
+                // Wait for the approval transaction to be confirmed
+                await waitForReceipt({
+                    client,
+                    chain,
+                    transactionHash: approvalResult.transactionHash
+                });
+                
+                console.log('✅ USDT unlimited approval confirmed on blockchain');
+            } catch (receiptError) {
+                console.warn('⚠️ Could not wait for receipt, but transaction was sent. Adding delay...');
+                // Fallback: add a fixed delay to allow blockchain to process
+                await sleep(3000); // 3 second delay
+            }
+            
+            // Verify the allowance is actually updated with retry mechanism
+            console.log('🔄 Verifying USDT allowance update...');
+            const updatedAllowance = await retryWithBackoff(async () => {
+                const allowance = await getUSDTAllowance(account.address);
+                
+                if (allowance < requiredAmount) {
+                    throw new Error(`USDT allowance still insufficient: ${allowance.toString()} < ${requiredAmount.toString()}`);
+                }
+                
+                return allowance;
+            }, 5, 1000); // 5 retries with 1s base delay
+            
+            console.log('✅ USDT allowance verified:', updatedAllowance.toString());
             return true;
         }
         
@@ -163,7 +310,102 @@ export async function ensureUSDTApproval(params: { account: Account; requiredAmo
         return true;
     } catch (error) {
         console.error('❌ Error ensuring USDT approval:', error);
-        throw new Error(`Failed to ensure USDT approval: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        
+        // Enhanced error handling
+        if (error instanceof Error) {
+            if (error.message.includes('user rejected')) {
+                throw new Error('USDT approval was rejected by user.');
+            } else if (error.message.includes('insufficient funds')) {
+                throw new Error('Insufficient ETH balance for approval transaction.');
+            } else {
+                throw new Error(`Failed to ensure USDT approval: ${error.message}`);
+            }
+        } else {
+            throw new Error('Failed to ensure USDT approval: Unknown error occurred');
+        }
+    }
+}
+
+/**
+ * Auto-approve Cirqa if needed for a specific spender and amount
+ * Returns true if approval was successful or not needed
+ */
+export async function ensureCirqaApproval(params: { account: Account; spender: string; requiredAmount: bigint }): Promise<boolean> {
+    try {
+        const { account, spender, requiredAmount } = params;
+        
+        console.log('🔍 Checking CIRQA approval requirements...');
+        console.log('   Account:', account.address);
+        console.log('   Spender:', spender);
+        console.log('   Required amount:', requiredAmount.toString());
+        
+        // Check if approval is needed
+        const needsApproval = await needsCirqaApproval(account.address, spender, requiredAmount);
+        
+        if (needsApproval) {
+            console.log('🔄 CIRQA approval needed, requesting unlimited approval...');
+            
+            const approveTransaction = prepareContractCall({
+                contract: cirqaTokenContract,
+                method: "function approve(address spender, uint256 amount) returns (bool)",
+                params: [spender, MaxUint256]
+            });
+
+            const approvalResult = await sendTransaction({
+                transaction: approveTransaction,
+                account
+            });
+            
+            console.log('⏳ Waiting for CIRQA approval transaction to be confirmed...');
+            
+            try {
+                // Wait for the approval transaction to be confirmed
+                await waitForReceipt({
+                    client,
+                    chain,
+                    transactionHash: approvalResult.transactionHash
+                });
+                
+                console.log('✅ CIRQA unlimited approval confirmed on blockchain');
+            } catch (receiptError) {
+                console.warn('⚠️ Could not wait for receipt, but transaction was sent. Adding delay...');
+                // Fallback: add a fixed delay to allow blockchain to process
+                await sleep(3000); // 3 second delay
+            }
+            
+            // Verify the allowance is actually updated with retry mechanism
+            console.log('🔄 Verifying CIRQA allowance update...');
+            const updatedAllowance = await retryWithBackoff(async () => {
+                const allowance = await getCirqaAllowance(account.address, spender);
+                
+                if (allowance < requiredAmount) {
+                    throw new Error(`CIRQA allowance still insufficient: ${allowance.toString()} < ${requiredAmount.toString()}`);
+                }
+                
+                return allowance;
+            }, 5, 1000); // 5 retries with 1s base delay
+            
+            console.log('✅ CIRQA allowance verified:', updatedAllowance.toString());
+            return true;
+        }
+        
+        console.log('✅ CIRQA approval already sufficient');
+        return true;
+    } catch (error) {
+        console.error('❌ Error ensuring CIRQA approval:', error);
+        
+        // Enhanced error handling
+        if (error instanceof Error) {
+            if (error.message.includes('user rejected')) {
+                throw new Error('CIRQA approval was rejected by user.');
+            } else if (error.message.includes('insufficient funds')) {
+                throw new Error('Insufficient ETH balance for approval transaction.');
+            } else {
+                throw new Error(`Failed to ensure CIRQA approval: ${error.message}`);
+            }
+        } else {
+            throw new Error('Failed to ensure CIRQA approval: Unknown error occurred');
+        }
     }
 }
 
