@@ -13,6 +13,7 @@ import Spinner from '@/app/Spinner';
 
 type ScholarshipStatsProps = {
   className?: string;
+  refreshTrigger?: number; // Used to trigger refresh from parent
 };
 
 type ScholarshipMetrics = {
@@ -25,7 +26,7 @@ type ScholarshipMetrics = {
   error: string | null;
 };
 
-const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '' }) => {
+const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', refreshTrigger }) => {
   const [metrics, setMetrics] = useState<ScholarshipMetrics>({
     totalScholarships: 0,
     totalFundingAmount: BigInt(0),
@@ -35,6 +36,31 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '' }) =
     isLoading: true,
     error: null
   });
+
+  // Custom formatter for statistics with comma separators and decimal precision
+  // Examples: 1234567890 (6 decimals) → "1,234.57", 5000000 → "5.00"
+  const formatStatsNumber = (value: bigint, decimals: number = 6, decimalPlaces: number = 2): string => {
+    try {
+      // Convert bigint to number with proper decimal handling
+      const divisor = Math.pow(10, decimals);
+      const numberValue = Number(value) / divisor;
+      
+      // Format with commas and specified decimal places (US locale format)
+      return numberValue.toLocaleString('en-US', {
+        minimumFractionDigits: decimalPlaces,
+        maximumFractionDigits: decimalPlaces
+      });
+    } catch (error) {
+      console.error('Error formatting stats number:', error);
+      return '0.00';
+    }
+  };
+
+  // Format regular numbers with comma separators (for counts and IDs)
+  // Examples: 1234 → "1,234", 50000 → "50,000"
+  const formatInteger = (value: number): string => {
+    return value.toLocaleString('en-US');
+  };
 
   const fetchMetrics = async () => {
     setMetrics(prev => ({ ...prev, isLoading: true, error: null }));
@@ -113,6 +139,14 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '' }) =
     fetchMetrics();
   }, []);
 
+  // Refresh when triggered by parent
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      console.log('📊 Stats refresh triggered by parent');
+      fetchMetrics();
+    }
+  }, [refreshTrigger]);
+
   const handleRetry = () => {
     fetchMetrics();
   };
@@ -141,56 +175,56 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '' }) =
       </div>
       
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-        {/* Total Scholarships */}
+        {/* Total Scholarships - Integer count with commas */}
         <div className="bg-blue-900/20 rounded p-2 text-center">
           <FaGraduationCap className="text-blue-400 text-xs mx-auto mb-1" />
           <div className="text-sm font-bold text-blue-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : metrics.totalScholarships}
+            {metrics.isLoading ? <Spinner size="sm" /> : formatInteger(metrics.totalScholarships)}
           </div>
           <div className="text-xs text-gray-500">Total</div>
         </div>
         
-        {/* Total Funding */}
+        {/* Total Funding - USDT amount with 2 decimal places and commas */}
         <div className="bg-green-900/20 rounded p-2 text-center">
           <FaDollarSign className="text-green-400 text-xs mx-auto mb-1" />
           <div className="text-sm font-bold text-green-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatCurrency(metrics.totalFundingAmount, 6, '', 0)}
+            {metrics.isLoading ? <Spinner size="sm" /> : formatStatsNumber(metrics.totalFundingAmount, 6, 2)}
           </div>
           <div className="text-xs text-gray-500">Funded</div>
         </div>
         
-        {/* Active Scholarships */}
+        {/* Active Scholarships - Integer count with commas */}
         <div className="bg-purple-900/20 rounded p-2 text-center">
           <FaChartLine className="text-purple-400 text-xs mx-auto mb-1" />
           <div className="text-sm font-bold text-purple-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : metrics.activeScholarships}
+            {metrics.isLoading ? <Spinner size="sm" /> : formatInteger(metrics.activeScholarships)}
           </div>
           <div className="text-xs text-gray-500">Active</div>
         </div>
         
-        {/* Unique Students */}
+        {/* Unique Students - Integer count with commas */}
         <div className="bg-orange-900/20 rounded p-2 text-center">
           <FaUsers className="text-orange-400 text-xs mx-auto mb-1" />
           <div className="text-sm font-bold text-orange-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : metrics.studentsCount}
+            {metrics.isLoading ? <Spinner size="sm" /> : formatInteger(metrics.studentsCount)}
           </div>
           <div className="text-xs text-gray-500">Students</div>
         </div>
 
-        {/* Total Withdrawn */}
+        {/* Total Withdrawn - USDT amount with 2 decimal places and commas */}
         <div className="bg-yellow-900/20 rounded p-2 text-center">
           <FaDollarSign className="text-yellow-400 text-xs mx-auto mb-1" />
           <div className="text-sm font-bold text-yellow-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatCurrency(metrics.totalWithdrawals, 6, '', 0)}
+            {metrics.isLoading ? <Spinner size="sm" /> : formatStatsNumber(metrics.totalWithdrawals, 6, 2)}
           </div>
           <div className="text-xs text-gray-500">Withdrawn</div>
         </div>
         
-        {/* Available Balance */}
+        {/* Available Balance - USDT amount with 2 decimal places and commas */}
         <div className="bg-emerald-900/20 rounded p-2 text-center">
           <FaDollarSign className="text-emerald-400 text-xs mx-auto mb-1" />
           <div className="text-sm font-bold text-emerald-400">
-            {metrics.isLoading ? <Spinner size="sm" /> : formatCurrency(metrics.totalFundingAmount - metrics.totalWithdrawals, 6, '', 0)}
+            {metrics.isLoading ? <Spinner size="sm" /> : formatStatsNumber(metrics.totalFundingAmount - metrics.totalWithdrawals, 6, 2)}
           </div>
           <div className="text-xs text-gray-500">Available</div>
         </div>

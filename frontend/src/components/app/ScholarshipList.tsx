@@ -31,7 +31,15 @@ type Scholarship = {
   exists: boolean;
 };
 
-const ScholarshipList: React.FC = () => {
+type ScholarshipListProps = {
+  onViewModeChange?: (isDetailView: boolean) => void;
+  onRefreshStats?: () => void;
+};
+
+const ScholarshipList: React.FC<ScholarshipListProps> = ({ 
+  onViewModeChange,
+  onRefreshStats
+}) => {
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +52,21 @@ const ScholarshipList: React.FC = () => {
     sortBy: 'id',
     sortOrder: 'asc'
   });
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   
   const account = useActiveAccount();
+  
+  // Utility function for blockchain update delay
+  const waitForBlockchainUpdate = async (delayMs: number = 1500) => {
+    console.log('⏳ Allowing time for blockchain data to propagate...');
+    console.log(`⏰ List refresh delay duration: ${delayMs}ms`);
+    setIsRefreshingData(true);
+    
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    
+    console.log('✅ Blockchain propagation wait completed');
+    setIsRefreshingData(false);
+  };
   
   // Get parsed metadata with IPFS support
   const getParsedMetadata = (metadataString: string, scholarshipId: number): ParsedMetadata => {
@@ -140,16 +161,39 @@ const ScholarshipList: React.FC = () => {
     // No additional logic needed, just the dependency will cause re-render
   }, [ipfsMetadataCache]);
 
+  // Notify parent about initial view mode
+  useEffect(() => {
+    onViewModeChange?.(selectedScholarshipId !== null);
+  }, [selectedScholarshipId, onViewModeChange]);
+
   const handleScholarshipClick = (scholarshipId: number) => {
     setSelectedScholarshipId(scholarshipId);
+    // Notify parent that we're entering detail view
+    onViewModeChange?.(true);
   };
 
-  const handleBackToList = () => {
+  const handleBackToList = async () => {
     setSelectedScholarshipId(null);
+    // Notify parent that we're returning to list view
+    onViewModeChange?.(false);
+    
+    // Refresh data when returning from details (user might have performed operations)
+    console.log('🔄 Refreshing list after returning from details...');
+    await refreshScholarshipsWithDelay();
+    
+    // Also refresh global statistics
+    console.log('📊 Refreshing global statistics...');
+    onRefreshStats?.();
   };
 
   const handleRetry = () => {
     fetchScholarships();
+  };
+
+  // Enhanced refresh function with blockchain delay
+  const refreshScholarshipsWithDelay = async () => {
+    await waitForBlockchainUpdate();
+    await fetchScholarships();
   };
 
   // Apply filters to scholarships
@@ -218,12 +262,17 @@ const ScholarshipList: React.FC = () => {
     );
   }
 
-  if (loading) {
+  if (loading || isRefreshingData) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-center">
           <Spinner size="lg" />
-          <p className="text-gray-400 mt-4">Loading scholarships...</p>
+          <p className="text-gray-400 mt-4">
+            {isRefreshingData ? 'Refreshing scholarship data...' : 'Loading scholarships...'}
+          </p>
+          {isRefreshingData && (
+            <p className="text-yellow-400 text-sm mt-2">⏳ Waiting for latest blockchain data</p>
+          )}
         </div>
       </div>
     );
@@ -262,7 +311,7 @@ const ScholarshipList: React.FC = () => {
       <div className="mb-4">
         <ScholarshipFilter 
           onFilterChange={handleFilterChange} 
-          onRefresh={fetchScholarships}
+          onRefresh={refreshScholarshipsWithDelay}
         />
       </div>
       
