@@ -1,6 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { upload } from 'thirdweb/storage';
+import { createThirdwebClient } from 'thirdweb';
+import { createScholarship } from '@/helper';
+import { useActiveAccount } from 'thirdweb/react';
 
 type ScholarshipMetadata = {
   name: string;
@@ -45,6 +49,20 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createStatus, setCreateStatus] = useState<{
+    step: string;
+    message: string;
+    isError: boolean;
+  } | null>(null);
+
+  // Get connected wallet
+  const account = useActiveAccount();
+
+  // Create Thirdweb client for IPFS
+  const client = useMemo(() => createThirdwebClient({
+    clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID!,
+  }), []);
 
   const handleInputChange = (field: string, value: string) => {
     setMetadata(prev => ({
@@ -152,7 +170,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
   const jsonString = useMemo(() => {
     return JSON.stringify(finalMetadata, null, 2);
   }, [finalMetadata]);
-
+    
   // Auto-trigger callback when metadata changes
   useEffect(() => {
     onMetadataGenerated(finalMetadata, jsonString);
@@ -198,17 +216,117 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
     setShowConfirmModal(true);
   };
 
-  const handleConfirmCreate = () => {
-    if (termsAccepted && onCreateScholarship) {
-      setShowConfirmModal(false);
-      setTermsAccepted(false);
-      onCreateScholarship(finalMetadata, jsonString);
+  const handleConfirmCreate = async () => {
+    if (!termsAccepted || !account) {
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateStatus({
+      step: 'Preparing',
+      message: 'Preparing metadata for upload...',
+      isError: false
+    });
+
+    try {
+      // Step 1: Upload metadata to IPFS
+      setCreateStatus({
+        step: 'Uploading',
+        message: 'Uploading metadata to IPFS...',
+        isError: false
+      });
+
+      const metadataToUpload = {
+        name: finalMetadata.name,
+        description: finalMetadata.description,
+        image: finalMetadata.image,
+        attributes: finalMetadata.attributes,
+        contact: finalMetadata.contact,
+        documents: finalMetadata.documents,
+        created_at: new Date().toISOString(),
+        version: "1.0"
+      };
+
+      const uris = await upload({
+        client,
+        files: [metadataToUpload]
+      });
+
+      const metadataUri = uris[0];
+      console.log('Metadata uploaded to IPFS:', metadataUri);
+
+      // Step 2: Create scholarship NFT on blockchain
+      setCreateStatus({
+        step: 'Minting',
+        message: 'Creating scholarship NFT on blockchain...',
+        isError: false
+      });
+
+      const txHash = await createScholarship({
+        metadata: metadataUri,
+        account
+      });
+
+      console.log('Scholarship created with transaction:', txHash);
+
+      // Step 3: Success
+      setCreateStatus({
+        step: 'Success',
+        message: `Scholarship NFT created successfully! Transaction: ${txHash}`,
+        isError: false
+      });
+
+      // Call parent callback if provided
+      if (onCreateScholarship) {
+        onCreateScholarship(finalMetadata, jsonString);
+      }
+
+      // Auto-close modal after success delay
+      setTimeout(() => {
+        setShowConfirmModal(false);
+        setTermsAccepted(false);
+        setIsCreating(false);
+        setCreateStatus(null);
+      }, 5000);
+
+    } catch (error: any) {
+      console.error('Error creating scholarship:', error);
+      
+      let errorMessage = 'Failed to create scholarship. Please try again.';
+      
+      if (error?.message?.includes('User rejected')) {
+        errorMessage = 'Transaction was rejected by user.';
+      } else if (error?.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for transaction.';
+      } else if (error?.message?.includes('IPFS')) {
+        errorMessage = 'Failed to upload metadata to IPFS. Please check your connection.';
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      setCreateStatus({
+        step: 'Error',
+        message: errorMessage,
+        isError: true
+      });
+
+      setIsCreating(false);
     }
   };
 
   const handleCloseModal = () => {
+    if (!isCreating) {
+      setShowConfirmModal(false);
+      setTermsAccepted(false);
+      setCreateStatus(null);
+    }
+  };
+
+  const resetModal = () => {
     setShowConfirmModal(false);
     setTermsAccepted(false);
+    setIsCreating(false);
+    setCreateStatus(null);
   };
 
   return (
@@ -220,34 +338,34 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
         <div className="lg:col-span-2 bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h2 className="text-lg font-semibold mb-4">Scholarship Information</h2>
           
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Scholarship Name</label>
-              <input
-                type="text"
-                value={metadata.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Scholarship Name</label>
+          <input
+            type="text"
+            value={metadata.name}
+            onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="e.g., John Doe's Computer Science Scholarship, Jane's Art School Fund"
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
-              <textarea
-                value={metadata.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
+            className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium mb-1">Description</label>
+          <textarea
+            value={metadata.description}
+            onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Describe your educational background, school/university goals, and why you need funding"
-                rows={4}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            
-            <div>
+            rows={4}
+            className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        
+        <div>
               <label className="block text-sm font-medium mb-1">Student Photo</label>
               {!metadata.image ? (
                 <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center">
-                  <input
+          <input
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
@@ -281,48 +399,48 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                   </button>
                 </div>
               )}
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-medium mb-2">Attributes</h4>
-              <div className="space-y-3">
-                {metadata.attributes.map((attr, index) => (
-                  <div key={index} className="flex items-center">
-                    <span className="w-1/3 text-sm text-gray-400">{attr.trait_type}</span>
-                    <input
-                      type="text"
-                      value={attr.value}
-                      onChange={(e) => handleAttributeChange(index, e.target.value)}
+        </div>
+        
+        <div>
+          <h4 className="text-sm font-medium mb-2">Attributes</h4>
+          <div className="space-y-3">
+            {metadata.attributes.map((attr, index) => (
+              <div key={index} className="flex items-center">
+                <span className="w-1/3 text-sm text-gray-400">{attr.trait_type}</span>
+                <input
+                  type="text"
+                  value={attr.value}
+                  onChange={(e) => handleAttributeChange(index, e.target.value)}
                       placeholder={attr.trait_type === 'University or School' ? 'e.g., Harvard University, Jakarta High School' : `Enter ${attr.trait_type.toLowerCase()}`}
-                      className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                ))}
+                  className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
               </div>
+            ))}
+          </div>
+        </div>
+        
+        <div>
+          <h4 className="text-sm font-medium mb-2">Contact Information</h4>
+          <div className="space-y-3">
+            <div className="flex items-center">
+              <span className="w-1/3 text-sm text-gray-400">Email</span>
+              <input
+                type="email"
+                value={metadata.contact.email}
+                onChange={(e) => handleContactChange('email', e.target.value)}
+                placeholder="your.email@example.com"
+                className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
             </div>
-            
-            <div>
-              <h4 className="text-sm font-medium mb-2">Contact Information</h4>
-              <div className="space-y-3">
-                <div className="flex items-center">
-                  <span className="w-1/3 text-sm text-gray-400">Email</span>
-                  <input
-                    type="email"
-                    value={metadata.contact.email}
-                    onChange={(e) => handleContactChange('email', e.target.value)}
-                    placeholder="your.email@example.com"
-                    className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex items-center">
-                  <span className="w-1/3 text-sm text-gray-400">Twitter</span>
-                  <input
-                    type="text"
-                    value={metadata.contact.twitter}
-                    onChange={(e) => handleContactChange('twitter', e.target.value)}
-                    placeholder="@username"
-                    className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+            <div className="flex items-center">
+              <span className="w-1/3 text-sm text-gray-400">Twitter</span>
+              <input
+                type="text"
+                value={metadata.contact.twitter}
+                onChange={(e) => handleContactChange('twitter', e.target.value)}
+                placeholder="@username"
+                className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
                 </div>
               </div>
             </div>
@@ -525,7 +643,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
           </div>
         </div>
       </div>
-
+      
       {/* Bottom Section: Terms & Create Button */}
       <div className="mt-6 space-y-4">
 
@@ -541,9 +659,9 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
             
             <div className="flex flex-col sm:flex-row gap-3">
               
-              <button
+        <button
                 type="button"
-                disabled={validateRequiredFields().length > 0}
+                disabled={validateRequiredFields().length > 0 || !account}
                 className="cursor-pointer px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center"
                 onClick={handleCreateClick}
               >
@@ -555,16 +673,24 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
             </div>
           </div>
           
-          {validateRequiredFields().length > 0 && (
+          {(validateRequiredFields().length > 0 || !account) && (
             <div className="mt-3 p-2 bg-orange-900/20 rounded border border-orange-700">
-              <p className="text-orange-400 text-xs mb-1">
-                ⚠️ Please complete the following required fields:
-              </p>
-              <ul className="text-orange-300 text-xs space-y-1">
-                {validateRequiredFields().map((field, index) => (
-                  <li key={index}>• {field}</li>
-                ))}
-              </ul>
+              {!account ? (
+                <p className="text-orange-400 text-xs">
+                  ⚠️ Please connect your wallet to create a scholarship.
+                </p>
+              ) : (
+                <>
+                  <p className="text-orange-400 text-xs mb-1">
+                    ⚠️ Please complete the following required fields:
+                  </p>
+                  <ul className="text-orange-300 text-xs space-y-1">
+                    {validateRequiredFields().map((field, index) => (
+                      <li key={index}>• {field}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -580,135 +706,235 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
             <div className="p-6">
               {/* Modal Header */}
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-white">⚠️ Confirm Scholarship Creation</h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="text-gray-400 hover:text-white"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <h2 className="text-xl font-semibold text-white">
+                  {isCreating ? '🔄 Creating Scholarship' : '⚠️ Confirm Scholarship Creation'}
+                </h2>
+                {!isCreating && (
+                  <button
+                    onClick={handleCloseModal}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
 
-              {/* Data Completeness Check */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-white mb-3">📋 Data Completeness Check</h3>
-                {(() => {
-                  const missingFields = validateRequiredFields();
-                  return missingFields.length === 0 ? (
-                    <div className="bg-green-900/20 border border-green-700 rounded p-3">
-                      <p className="text-green-400 text-sm">✅ All required fields are complete!</p>
-                    </div>
-                  ) : (
-                    <div className="bg-red-900/20 border border-red-700 rounded p-3">
-                      <p className="text-red-400 text-sm mb-2">❌ Missing required fields:</p>
-                      <ul className="text-red-300 text-sm space-y-1">
-                        {missingFields.map((field, index) => (
-                          <li key={index}>• {field}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Blockchain Warning */}
-              <div className="mb-6">
-                <div className="bg-yellow-900/20 border border-yellow-700 rounded p-4">
-                  <h3 className="text-lg font-medium text-yellow-400 mb-2">🔗 Blockchain Permanency Warning</h3>
-                  <div className="text-sm text-yellow-100 space-y-2">
-                    <p><strong>⚠️ IMPORTANT:</strong> Once created, your scholarship data will be stored permanently on the blockchain and <strong>CANNOT be deleted or modified</strong>.</p>
-                    <ul className="space-y-1 text-yellow-200 ml-4">
-                      <li>• Your information will be publicly visible</li>
-                      <li>• Photo and documents will be stored as base64 data</li>
-                      <li>• Smart contract interactions are irreversible</li>
-                      <li>• All transactions are recorded permanently</li>
+              {/* Wallet Connection Check */}
+              {!account && (
+                <div className="mb-6">
+                  <div className="bg-red-900/20 border border-red-700 rounded p-4">
+                    <h3 className="text-lg font-medium text-red-400 mb-2">🔌 Wallet Not Connected</h3>
+                    <p className="text-red-300 text-sm">
+                      Please connect your wallet to create a scholarship. You need a connected wallet to:
+                    </p>
+                    <ul className="text-red-200 text-sm mt-2 space-y-1 ml-4">
+                      <li>• Sign transactions for NFT minting</li>
+                      <li>• Pay gas fees for blockchain operations</li>
+                      <li>• Own and manage your scholarship NFT</li>
                     </ul>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Data Preview Summary */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-white mb-3">📄 Your Scholarship Summary</h3>
-                <div className="bg-gray-700/50 rounded p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Name:</span>
-                    <span className="text-white">{metadata.name || 'Not set'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Photo:</span>
-                    <span className="text-white">{metadata.image ? '✅ Uploaded' : '❌ Missing'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Email:</span>
-                    <span className="text-white">{metadata.contact.email || 'Not set'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Academic Info:</span>
-                    <span className="text-white">
-                      {metadata.attributes.filter(attr => attr.value.trim() !== '').length}/4 fields
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Documents:</span>
-                    <span className="text-white">
-                      {metadata.documents.filter(doc => doc.name.trim() !== '' && doc.url.trim() !== '').length} attached
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Terms & Conditions Checkbox */}
-              <div className="mb-6">
-                <div className="bg-gray-700/30 rounded p-4">
-                  <label className="flex items-start space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="mt-1 w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                    />
-                    <div className="text-sm">
-                      <p className="text-white font-medium mb-1">I have read and agree to the Terms & Conditions</p>
-                      <p className="text-gray-400">
-                        I understand that my scholarship data will be stored permanently on the blockchain, 
-                        that I will use any received funds for educational purposes only, and that all 
-                        transactions are final and irreversible.
-                      </p>
+              {/* Creation Progress */}
+              {isCreating && createStatus && (
+                <div className="mb-6">
+                  <div className={`border rounded p-4 ${
+                    createStatus.isError 
+                      ? 'bg-red-900/20 border-red-700' 
+                      : createStatus.step === 'Success'
+                      ? 'bg-green-900/20 border-green-700'
+                      : 'bg-blue-900/20 border-blue-700'
+                  }`}>
+                    <div className="flex items-center mb-2">
+                      {createStatus.isError ? (
+                        <span className="text-red-400 text-xl mr-2">❌</span>
+                      ) : createStatus.step === 'Success' ? (
+                        <span className="text-green-400 text-xl mr-2">✅</span>
+                      ) : (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400 mr-2"></div>
+                      )}
+                      <h3 className={`text-lg font-medium ${
+                        createStatus.isError 
+                          ? 'text-red-400' 
+                          : createStatus.step === 'Success'
+                          ? 'text-green-400'
+                          : 'text-blue-400'
+                      }`}>
+                        {createStatus.step}
+                      </h3>
                     </div>
-                  </label>
+                    <p className={`text-sm ${
+                      createStatus.isError 
+                        ? 'text-red-300' 
+                        : createStatus.step === 'Success'
+                        ? 'text-green-300'
+                        : 'text-blue-300'
+                    }`}>
+                      {createStatus.message}
+                    </p>
+                    
+                    {createStatus.step === 'Success' && (
+                      <div className="mt-3 p-2 bg-green-800/30 rounded">
+                        <p className="text-green-200 text-xs">
+                          🎉 Your scholarship NFT has been created! You can now receive funding from investors.
+                          This modal will close automatically in a few seconds.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {createStatus.isError && (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={resetModal}
+                          className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm"
+                        >
+                          Close
+                        </button>
+                        <button
+                          onClick={() => {
+                            setCreateStatus(null);
+                            setIsCreating(false);
+                          }}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Show confirmation sections only when not creating */}
+              {!isCreating && (
+                <>
+                  {/* Data Completeness Check */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium text-white mb-3">📋 Data Completeness Check</h3>
+                    {(() => {
+                      const missingFields = validateRequiredFields();
+                      return missingFields.length === 0 ? (
+                        <div className="bg-green-900/20 border border-green-700 rounded p-3">
+                          <p className="text-green-400 text-sm">✅ All required fields are complete!</p>
+                        </div>
+                      ) : (
+                        <div className="bg-red-900/20 border border-red-700 rounded p-3">
+                          <p className="text-red-400 text-sm mb-2">❌ Missing required fields:</p>
+                          <ul className="text-red-300 text-sm space-y-1">
+                            {missingFields.map((field, index) => (
+                              <li key={index}>• {field}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Blockchain Warning */}
+                  <div className="mb-6">
+                    <div className="bg-yellow-900/20 border border-yellow-700 rounded p-4">
+                      <h3 className="text-lg font-medium text-yellow-400 mb-2">🔗 Blockchain Permanency Warning</h3>
+                      <div className="text-sm text-yellow-100 space-y-2">
+                        <p><strong>⚠️ IMPORTANT:</strong> Once created, your scholarship data will be stored permanently on the blockchain and <strong>CANNOT be deleted or modified</strong>.</p>
+                        <ul className="space-y-1 text-yellow-200 ml-4">
+                          <li>• Your information will be publicly visible</li>
+                          <li>• Photo and documents will be stored as base64 data</li>
+                          <li>• Smart contract interactions are irreversible</li>
+                          <li>• All transactions are recorded permanently</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Data Preview Summary */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium text-white mb-3">📄 Your Scholarship Summary</h3>
+                    <div className="bg-gray-700/50 rounded p-4 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Name:</span>
+                        <span className="text-white">{metadata.name || 'Not set'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Photo:</span>
+                        <span className="text-white">{metadata.image ? '✅ Uploaded' : '❌ Missing'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Email:</span>
+                        <span className="text-white">{metadata.contact.email || 'Not set'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Academic Info:</span>
+                        <span className="text-white">
+                          {metadata.attributes.filter(attr => attr.value.trim() !== '').length}/4 fields
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Documents:</span>
+                        <span className="text-white">
+                          {metadata.documents.filter(doc => doc.name.trim() !== '' && doc.url.trim() !== '').length} attached
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Terms & Conditions Checkbox */}
+                  <div className="mb-6">
+                    <div className="bg-gray-700/30 rounded p-4">
+                      <label className="flex items-start space-x-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={termsAccepted}
+                          onChange={(e) => setTermsAccepted(e.target.checked)}
+                          className="mt-1 w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                        />
+                        <div className="text-sm">
+                          <p className="text-white font-medium mb-1">I have read and agree to the Terms & Conditions</p>
+                          <p className="text-gray-400">
+                            I understand that my scholarship data will be stored permanently on the blockchain, 
+                            that I will use any received funds for educational purposes only, and that all 
+                            transactions are final and irreversible.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmCreate}
-                  disabled={!termsAccepted || validateRequiredFields().length > 0 || !onCreateScholarship}
-                  className="px-6 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Yes, Create Scholarship
-                </button>
-              </div>
+              {!isCreating && (
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleCloseModal}
+                    className="cursor-pointer px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmCreate}
+                    disabled={!termsAccepted || validateRequiredFields().length > 0 || !account}
+                    className="cursor-pointer px-6 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Yes, Create Scholarship
+        </button>
+      </div>
+              )}
 
               {/* Final Warning */}
-              <div className="mt-4 p-3 bg-red-900/20 border border-red-700 rounded">
-                <p className="text-red-400 text-xs text-center">
-                  ⚠️ By clicking "Yes, Create Scholarship Permanently", you acknowledge that this action is irreversible 
-                  and your data will be permanently recorded on the blockchain.
-                </p>
-              </div>
+              {!isCreating && (
+                <div className="mt-4 p-3 bg-red-900/20 border border-red-700 rounded">
+                  <p className="text-red-400 text-xs text-center">
+                    ⚠️ By clicking "Yes, Create Scholarship", you acknowledge that this action is irreversible 
+                    and your data will be permanently recorded on the blockchain.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

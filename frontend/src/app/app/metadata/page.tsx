@@ -11,9 +11,9 @@ const MetadataGeneratorPage: React.FC = () => {
   };
 
   const handleCreateScholarship = (metadata: any, json: string) => {
-    // This will integrate with the actual create scholarship flow
-    console.log('Creating scholarship with metadata:', metadata);
-    alert('Scholarship creation will be implemented - this will connect to CreateScholarshipModal');
+    // This callback is called after successful scholarship creation
+    console.log('Scholarship created successfully with metadata:', metadata);
+    // Here you could add analytics, redirect user, show success notification, etc.
   };
 
   return (
