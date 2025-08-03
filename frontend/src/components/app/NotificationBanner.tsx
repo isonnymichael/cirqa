@@ -59,7 +59,7 @@ const NotificationBanner: React.FC<NotificationBannerProps> = ({
     }
   };
 
-  const getIcon = (): JSX.Element => {
+  const getIcon = (): React.ReactElement => {
     switch (type) {
       case 'info':
         return (
