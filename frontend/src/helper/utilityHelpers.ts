@@ -12,7 +12,7 @@ export function formatAddress(address: string, startChars: number = 6, endChars:
 }
 
 /**
- * Format currency amount with proper decimals
+ * Format currency amount with proper decimals and thousand separators
  */
 export function formatCurrency(
     amount: bigint, 
@@ -24,8 +24,11 @@ export function formatCurrency(
     const quotient = amount / divisor;
     const remainder = amount % divisor;
     
+    // Format quotient with thousand separators
+    const formattedQuotient = Number(quotient).toLocaleString();
+    
     if (remainder === BigInt(0)) {
-        return `${quotient.toString()}${symbol ? ' ' + symbol : ''}`;
+        return `${formattedQuotient}${symbol ? ' ' + symbol : ''}`;
     }
     
     let remainderStr = remainder.toString().padStart(decimals, '0');
@@ -37,10 +40,10 @@ export function formatCurrency(
     }
     
     if (remainderStr === '') {
-        return `${quotient.toString()}${symbol ? ' ' + symbol : ''}`;
+        return `${formattedQuotient}${symbol ? ' ' + symbol : ''}`;
     }
     
-    return `${quotient}.${remainderStr}${symbol ? ' ' + symbol : ''}`;
+    return `${formattedQuotient}.${remainderStr}${symbol ? ' ' + symbol : ''}`;
 }
 
 /**

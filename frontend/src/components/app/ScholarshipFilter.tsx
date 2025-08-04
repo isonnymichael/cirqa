@@ -26,7 +26,7 @@ const ScholarshipFilter: React.FC<ScholarshipFilterProps> = ({
     minBalance: '0',
     minScore: '0',
     sortBy: 'id',
-    sortOrder: 'asc'
+    sortOrder: 'desc'
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -47,7 +47,7 @@ const ScholarshipFilter: React.FC<ScholarshipFilterProps> = ({
         minBalance: '0',
         minScore: '0',
         sortBy: 'id' as const,
-        sortOrder: 'asc' as const
+        sortOrder: 'desc' as const
       };
       setFilters(defaultFilters);
       onFilterChange(defaultFilters);
