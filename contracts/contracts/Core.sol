@@ -99,6 +99,7 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
     function fundScholarship(uint256 tokenId, uint256 amount) external {
         require(_exists(tokenId), "Scholarship does not exist");
         require(amount > 0, "Amount must be greater than 0");
+        require(!scholarshipManager.isFrozen(tokenId), "Scholarship is frozen due to low performance score");
 
         // Transfer USDT from investor to contract
         require(usdtToken.transferFrom(msg.sender, address(this), amount), "USDT transfer failed");
@@ -127,6 +128,7 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
         require(_exists(tokenId), "Scholarship does not exist");
         require(scholarshipManager.isStudent(tokenId, msg.sender), "Only student can withdraw");
         require(scholarshipManager.hasEnoughBalance(tokenId, amount), "Insufficient balance");
+        require(!scholarshipManager.isFrozen(tokenId), "Scholarship is frozen due to low performance score");
 
         uint256 feeAmount = (amount * protocolFee) / 10000;
         uint256 amountToStudent = amount - feeAmount;
@@ -169,6 +171,16 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
     function setProtocolFee(uint256 newFee) external onlyOwner {
         require(newFee <= 1000, "Fee cannot exceed 10%"); // Max 10% (1000 basis points)
         protocolFee = newFee;
+    }
+    
+    /**
+     * @dev Updates freeze status for a scholarship based on current score
+     * @param tokenId The ID of the scholarship NFT
+     * @notice This function can be called by anyone to update freeze status
+     */
+    function updateScholarshipFreezeStatus(uint256 tokenId) external {
+        require(_exists(tokenId), "Scholarship does not exist");
+        scholarshipManager.updateFreezeStatus(tokenId);
     }
 
     // Override required functions

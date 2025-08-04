@@ -127,4 +127,26 @@ interface IScholarshipManager {
         uint256[] memory timestamps,
         uint256[] memory feeAmounts
     );
+    
+    // === FREEZE MANAGEMENT FUNCTIONS ===
+    
+    /**
+     * @dev Checks if a scholarship should be frozen based on score
+     * @param tokenId The ID of the scholarship NFT
+     * @return Whether the scholarship should be frozen
+     */
+    function shouldBeFrozen(uint256 tokenId) external view returns (bool);
+    
+    /**
+     * @dev Updates freeze status based on current score
+     * @param tokenId The ID of the scholarship NFT
+     */
+    function updateFreezeStatus(uint256 tokenId) external;
+    
+    /**
+     * @dev Checks if a scholarship is currently frozen
+     * @param tokenId The ID of the scholarship NFT
+     * @return Whether the scholarship is frozen
+     */
+    function isFrozen(uint256 tokenId) external view returns (bool);
 }

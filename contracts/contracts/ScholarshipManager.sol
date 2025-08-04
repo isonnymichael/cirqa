@@ -3,12 +3,17 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IScholarshipManager.sol";
+import "./interfaces/IScoreManager.sol";
 
 /**
  * @title ScholarshipManager
  * @dev Manages scholarship data and operations
  */
 contract ScholarshipManager is IScholarshipManager, Ownable {
+    // Events
+    event ScholarshipFrozen(uint256 indexed tokenId, uint256 currentScore);
+    event ScholarshipUnfrozen(uint256 indexed tokenId, uint256 currentScore);
+    
     struct WithdrawalRecord {
         uint256 amount;
         uint256 timestamp;
@@ -19,6 +24,7 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
         uint256 balance;
         string metadata; // IPFS hash containing student data (photos, documents, etc.)
         WithdrawalRecord[] withdrawalHistory;
+        bool isFrozen; // Whether scholarship is frozen due to low score
     }
 
     // Mapping from token ID to scholarship data
@@ -41,6 +47,12 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
     // Address of the Core contract
     address private coreContract;
     
+    // Score Manager contract for checking performance scores
+    IScoreManager public scoreManager;
+    
+    // Minimum score threshold (3.0 with 2 decimal precision = 300)
+    uint256 public constant MIN_SCORE_THRESHOLD = 300;
+    
     /**
      * @dev Modifier to ensure only the Core contract can call certain functions
      */
@@ -59,6 +71,15 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
     }
     
     /**
+     * @dev Sets the Score Manager contract address
+     * @param _scoreManager Address of the Score Manager contract
+     */
+    function setScoreManager(address _scoreManager) external onlyOwner {
+        require(_scoreManager != address(0), "Invalid address");
+        scoreManager = IScoreManager(_scoreManager);
+    }
+    
+    /**
      * @dev Initializes a new scholarship
      * @param tokenId The ID of the scholarship NFT
      * @param student Address of the student
@@ -68,6 +89,7 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
         scholarships[tokenId].student = student;
         scholarships[tokenId].balance = 0;
         scholarships[tokenId].metadata = metadata;
+        scholarships[tokenId].isFrozen = false; // Initialize as not frozen
         
         studentScholarships[student].push(tokenId);
         allScholarships.push(tokenId);
@@ -176,16 +198,72 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
         return studentScholarships[student];
     }
     
+    // === FREEZE MANAGEMENT FUNCTIONS ===
+    
     /**
-     * @dev Gets scholarship data
+     * @dev Checks if a scholarship should be frozen based on score
+     * @param tokenId The ID of the scholarship NFT
+     * @return Whether the scholarship should be frozen
+     */
+    function shouldBeFrozen(uint256 tokenId) public view returns (bool) {
+        if (address(scoreManager) == address(0)) {
+            return false; // If score manager not set, don't freeze
+        }
+        
+        uint256 currentScore = scoreManager.getScholarshipScore(tokenId);
+        return currentScore < MIN_SCORE_THRESHOLD && currentScore > 0; // Only freeze if has score and it's low
+    }
+    
+    /**
+     * @dev Updates freeze status based on current score
+     * @param tokenId The ID of the scholarship NFT
+     */
+    function updateFreezeStatus(uint256 tokenId) external {
+        bool shouldFreeze = shouldBeFrozen(tokenId);
+        scholarships[tokenId].isFrozen = shouldFreeze;
+        
+        if (shouldFreeze) {
+            emit ScholarshipFrozen(tokenId, scoreManager.getScholarshipScore(tokenId));
+        } else {
+            emit ScholarshipUnfrozen(tokenId, scoreManager.getScholarshipScore(tokenId));
+        }
+    }
+    
+    /**
+     * @dev Manual freeze/unfreeze by admin (emergency use)
+     * @param tokenId The ID of the scholarship NFT
+     * @param frozen Whether to freeze or unfreeze
+     */
+    function setFrozenStatus(uint256 tokenId, bool frozen) external onlyOwner {
+        scholarships[tokenId].isFrozen = frozen;
+        
+        if (frozen) {
+            emit ScholarshipFrozen(tokenId, scoreManager.getScholarshipScore(tokenId));
+        } else {
+            emit ScholarshipUnfrozen(tokenId, scoreManager.getScholarshipScore(tokenId));
+        }
+    }
+    
+    /**
+     * @dev Checks if a scholarship is currently frozen
+     * @param tokenId The ID of the scholarship NFT
+     * @return Whether the scholarship is frozen
+     */
+    function isFrozen(uint256 tokenId) external view returns (bool) {
+        return scholarships[tokenId].isFrozen;
+    }
+    
+    /**
+     * @dev Gets scholarship data including freeze status
      * @param tokenId The ID of the scholarship NFT
      * @return student Address of the student
      * @return balance Current balance of the scholarship
      * @return metadata IPFS hash containing student data
+     * @return frozen Whether the scholarship is frozen
      */
-    function getScholarshipData(uint256 tokenId) external view returns (address student, uint256 balance, string memory metadata) {
+    function getScholarshipData(uint256 tokenId) external view returns (address student, uint256 balance, string memory metadata, bool frozen) {
         ScholarshipData storage scholarship = scholarships[tokenId];
-        return (scholarship.student, scholarship.balance, scholarship.metadata);
+        return (scholarship.student, scholarship.balance, scholarship.metadata, scholarship.isFrozen);
     }
     
     // === INVESTOR TRACKING FUNCTIONS ===
