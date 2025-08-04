@@ -70,8 +70,6 @@ export {
 
 // Export new freeze management functions
 export {
-    isScholarshipFrozen,
-    shouldScholarshipBeFrozen,
     setScholarshipFrozenStatus,
     updateScholarshipFreezeStatus,
     getFreezeThreshold,
