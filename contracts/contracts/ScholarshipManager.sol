@@ -30,6 +30,14 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
     // Array of all scholarship token IDs
     uint256[] private allScholarships;
     
+    // Investor tracking mappings (Option 2)
+    mapping(uint256 => address[]) private scholarshipInvestors;
+    mapping(uint256 => mapping(address => uint256)) private investorContributions;
+    mapping(uint256 => uint256) private totalFundingReceived;
+    
+    // Withdrawal fee tracking (Hybrid approach)
+    mapping(uint256 => mapping(uint256 => uint256)) private withdrawalFees;
+    
     // Address of the Core contract
     address private coreContract;
     
@@ -66,12 +74,22 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
     }
     
     /**
-     * @dev Adds funds to a scholarship
+     * @dev Adds funds to a scholarship and tracks investor
      * @param tokenId The ID of the scholarship NFT
      * @param amount Amount to add to the scholarship balance
+     * @param investor Address of the investor
      */
-    function addFunds(uint256 tokenId, uint256 amount) external override onlyCore {
+    function addFunds(uint256 tokenId, uint256 amount, address investor) external override onlyCore {
         scholarships[tokenId].balance += amount;
+        
+        // Track investor if this is their first contribution
+        if (investorContributions[tokenId][investor] == 0) {
+            scholarshipInvestors[tokenId].push(investor);
+        }
+        
+        // Update investor contribution and total funding
+        investorContributions[tokenId][investor] += amount;
+        totalFundingReceived[tokenId] += amount;
     }
     
     /**
@@ -84,15 +102,24 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
     }
     
     /**
-     * @dev Records a withdrawal in the scholarship's history
+     * @dev Records a withdrawal in the scholarship's history with fee tracking
      * @param tokenId The ID of the scholarship NFT
-     * @param amount Amount that was withdrawn
+     * @param netAmount Amount that was received by student (after fee)
+     * @param feeAmount Fee amount that was deducted
      */
-    function recordWithdrawal(uint256 tokenId, uint256 amount) external override onlyCore {
+    function recordWithdrawal(uint256 tokenId, uint256 netAmount, uint256 feeAmount) external override onlyCore {
+        uint256 withdrawalIndex = scholarships[tokenId].withdrawalHistory.length;
+        
+        // Store basic withdrawal record (same gas as before)
         scholarships[tokenId].withdrawalHistory.push(WithdrawalRecord({
-            amount: amount,
+            amount: netAmount,
             timestamp: block.timestamp
         }));
+        
+        // Store fee separately only if > 0 (saves gas when no fee)
+        if (feeAmount > 0) {
+            withdrawalFees[tokenId][withdrawalIndex] = feeAmount;
+        }
     }
     
     /**
@@ -159,5 +186,80 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
     function getScholarshipData(uint256 tokenId) external view returns (address student, uint256 balance, string memory metadata) {
         ScholarshipData storage scholarship = scholarships[tokenId];
         return (scholarship.student, scholarship.balance, scholarship.metadata);
+    }
+    
+    // === INVESTOR TRACKING FUNCTIONS ===
+    
+    /**
+     * @dev Gets all investors for a scholarship
+     * @param tokenId The ID of the scholarship NFT
+     * @return Array of investor addresses
+     */
+    function getInvestors(uint256 tokenId) external view returns (address[] memory) {
+        return scholarshipInvestors[tokenId];
+    }
+    
+    /**
+     * @dev Gets the contribution amount of a specific investor
+     * @param tokenId The ID of the scholarship NFT
+     * @param investor Address of the investor
+     * @return Amount contributed by the investor
+     */
+    function getInvestorContribution(uint256 tokenId, address investor) external view returns (uint256) {
+        return investorContributions[tokenId][investor];
+    }
+    
+    /**
+     * @dev Gets the total funding received for a scholarship
+     * @param tokenId The ID of the scholarship NFT
+     * @return Total amount funded by all investors
+     */
+    function getTotalFunding(uint256 tokenId) external view returns (uint256) {
+        return totalFundingReceived[tokenId];
+    }
+    
+    /**
+     * @dev Gets investor count for a scholarship
+     * @param tokenId The ID of the scholarship NFT
+     * @return Number of unique investors
+     */
+    function getInvestorCount(uint256 tokenId) external view returns (uint256) {
+        return scholarshipInvestors[tokenId].length;
+    }
+    
+    // === WITHDRAWAL FEE FUNCTIONS ===
+    
+    /**
+     * @dev Gets the fee amount for a specific withdrawal
+     * @param tokenId The ID of the scholarship NFT
+     * @param withdrawalIndex Index of the withdrawal in history
+     * @return Fee amount for the withdrawal (0 if no fee)
+     */
+    function getWithdrawalFee(uint256 tokenId, uint256 withdrawalIndex) external view returns (uint256) {
+        return withdrawalFees[tokenId][withdrawalIndex];
+    }
+    
+    /**
+     * @dev Gets detailed withdrawal history including fees
+     * @param tokenId The ID of the scholarship NFT
+     * @return netAmounts Array of net amounts received by student
+     * @return timestamps Array of withdrawal timestamps
+     * @return feeAmounts Array of fee amounts deducted
+     */
+    function getDetailedWithdrawalHistory(uint256 tokenId) external view returns (
+        uint256[] memory netAmounts,
+        uint256[] memory timestamps,
+        uint256[] memory feeAmounts
+    ) {
+        uint256 historyLength = scholarships[tokenId].withdrawalHistory.length;
+        netAmounts = new uint256[](historyLength);
+        timestamps = new uint256[](historyLength);
+        feeAmounts = new uint256[](historyLength);
+
+        for (uint256 i = 0; i < historyLength; i++) {
+            netAmounts[i] = scholarships[tokenId].withdrawalHistory[i].amount;
+            timestamps[i] = scholarships[tokenId].withdrawalHistory[i].timestamp;
+            feeAmounts[i] = withdrawalFees[tokenId][i]; // 0 if no fee recorded
+        }
     }
 }

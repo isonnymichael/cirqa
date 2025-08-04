@@ -15,11 +15,12 @@ interface IScholarshipManager {
     function initializeScholarship(uint256 tokenId, address student, string memory metadata) external;
     
     /**
-     * @dev Adds funds to a scholarship
+     * @dev Adds funds to a scholarship and tracks investor
      * @param tokenId The ID of the scholarship NFT
      * @param amount Amount to add to the scholarship balance
+     * @param investor Address of the investor
      */
-    function addFunds(uint256 tokenId, uint256 amount) external;
+    function addFunds(uint256 tokenId, uint256 amount, address investor) external;
     
     /**
      * @dev Withdraws funds from a scholarship
@@ -29,11 +30,12 @@ interface IScholarshipManager {
     function withdrawFunds(uint256 tokenId, uint256 amount) external;
     
     /**
-     * @dev Records a withdrawal in the scholarship's history
+     * @dev Records a withdrawal in the scholarship's history with fee tracking
      * @param tokenId The ID of the scholarship NFT
-     * @param amount Amount that was withdrawn
+     * @param netAmount Amount that was received by student (after fee)
+     * @param feeAmount Fee amount that was deducted
      */
-    function recordWithdrawal(uint256 tokenId, uint256 amount) external;
+    function recordWithdrawal(uint256 tokenId, uint256 netAmount, uint256 feeAmount) external;
     
     /**
      * @dev Checks if an address is the student of a scholarship
@@ -71,4 +73,58 @@ interface IScholarshipManager {
      * @return Array of scholarship token IDs owned by the student
      */
     function getScholarshipsByStudent(address student) external view returns (uint256[] memory);
+    
+    // === INVESTOR TRACKING FUNCTIONS ===
+    
+    /**
+     * @dev Gets all investors for a scholarship
+     * @param tokenId The ID of the scholarship NFT
+     * @return Array of investor addresses
+     */
+    function getInvestors(uint256 tokenId) external view returns (address[] memory);
+    
+    /**
+     * @dev Gets the contribution amount of a specific investor
+     * @param tokenId The ID of the scholarship NFT
+     * @param investor Address of the investor
+     * @return Amount contributed by the investor
+     */
+    function getInvestorContribution(uint256 tokenId, address investor) external view returns (uint256);
+    
+    /**
+     * @dev Gets the total funding received for a scholarship
+     * @param tokenId The ID of the scholarship NFT
+     * @return Total amount funded by all investors
+     */
+    function getTotalFunding(uint256 tokenId) external view returns (uint256);
+    
+    /**
+     * @dev Gets investor count for a scholarship
+     * @param tokenId The ID of the scholarship NFT
+     * @return Number of unique investors
+     */
+    function getInvestorCount(uint256 tokenId) external view returns (uint256);
+    
+    // === WITHDRAWAL FEE FUNCTIONS ===
+    
+    /**
+     * @dev Gets the fee amount for a specific withdrawal
+     * @param tokenId The ID of the scholarship NFT
+     * @param withdrawalIndex Index of the withdrawal in history
+     * @return Fee amount for the withdrawal (0 if no fee)
+     */
+    function getWithdrawalFee(uint256 tokenId, uint256 withdrawalIndex) external view returns (uint256);
+    
+    /**
+     * @dev Gets detailed withdrawal history including fees
+     * @param tokenId The ID of the scholarship NFT
+     * @return netAmounts Array of net amounts received by student
+     * @return timestamps Array of withdrawal timestamps
+     * @return feeAmounts Array of fee amounts deducted
+     */
+    function getDetailedWithdrawalHistory(uint256 tokenId) external view returns (
+        uint256[] memory netAmounts,
+        uint256[] memory timestamps,
+        uint256[] memory feeAmounts
+    );
 }

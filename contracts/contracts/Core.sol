@@ -103,8 +103,8 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
         // Transfer USDT from investor to contract
         require(usdtToken.transferFrom(msg.sender, address(this), amount), "USDT transfer failed");
 
-        // Update scholarship balance
-        scholarshipManager.addFunds(tokenId, amount);
+        // Update scholarship balance and track investor
+        scholarshipManager.addFunds(tokenId, amount, msg.sender);
 
         // Calculate and transfer Cirqa rewards to investor
         // Convert USDT amount (6 decimals) to CIRQA amount (18 decimals) with reward rate
@@ -136,7 +136,7 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
         require(usdtToken.transfer(msg.sender, amountToStudent), "USDT transfer failed");
         require(usdtToken.transfer(owner(), feeAmount), "Fee transfer failed");
 
-        scholarshipManager.recordWithdrawal(tokenId, amountToStudent);
+        scholarshipManager.recordWithdrawal(tokenId, amountToStudent, feeAmount);
 
         emit FundsWithdrawn(tokenId, msg.sender, amountToStudent);
     }
