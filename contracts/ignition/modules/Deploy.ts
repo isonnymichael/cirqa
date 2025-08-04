@@ -22,8 +22,10 @@ const CirqaProtocolModule = buildModule("CirqaProtocolModule", (m) => {
   m.call(cirqaToken, "setMinter", [core]);
   m.call(cirqaToken, "setScoreManager", [scoreManager]);
   m.call(scholarshipManager, "setCoreContract", [core]);
+  m.call(scholarshipManager, "setScoreManager", [scoreManager]); // Add ScoreManager to ScholarshipManager
   m.call(scoreManager, "setCoreContract", [core]);
   m.call(scoreManager, "setCirqaToken", [cirqaToken]);
+  m.call(scoreManager, "setScholarshipManager", [scholarshipManager]); // Add ScholarshipManager to ScoreManager for auto-freeze
   m.call(core, "setScholarshipManager", [scholarshipManager]);
   m.call(core, "setScoreManager", [scoreManager]);
 

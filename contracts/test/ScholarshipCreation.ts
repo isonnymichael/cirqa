@@ -44,8 +44,10 @@ describe("ScholarshipCreation", function () {
     await cirqaToken.setMinter(await core.getAddress());
     await cirqaToken.setScoreManager(await scoreManager.getAddress());
     await scholarshipManager.setCoreContract(await core.getAddress());
+    await scholarshipManager.setScoreManager(await scoreManager.getAddress()); // Add ScoreManager to ScholarshipManager
     await scoreManager.setCoreContract(await core.getAddress());
     await scoreManager.setCirqaToken(await cirqaToken.getAddress());
+    await scoreManager.setScholarshipManager(await scholarshipManager.getAddress()); // Add ScholarshipManager to ScoreManager for auto-freeze
     await core.setScholarshipManager(await scholarshipManager.getAddress());
     await core.setScoreManager(await scoreManager.getAddress());
 

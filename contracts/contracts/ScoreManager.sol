@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IScoreManager.sol";
 import "./interfaces/ICirqaToken.sol";
+import "./interfaces/IScholarshipManager.sol";
 
 /**
  * @title ScoreManager
@@ -40,12 +41,16 @@ contract ScoreManager is IScoreManager, Ownable {
     // Cirqa token contract
     ICirqaToken private cirqaToken;
     
+    // Scholarship Manager contract for auto-freeze functionality
+    IScholarshipManager private scholarshipManager;
+    
     // Minimum amount of tokens required for rating
     uint256 public minRatingTokens = 1e18; // 1 Cirqa token
     
     // Events
     event ScholarshipRated(uint256 indexed tokenId, address indexed investor, uint8 score, uint256 tokens);
     event MinRatingTokensUpdated(uint256 oldValue, uint256 newValue);
+    event AutoFreezeStatusUpdated(uint256 indexed tokenId, bool frozen, uint256 currentScore);
     
     /**
      * @dev Modifier to ensure only the Core contract can call certain functions
@@ -71,6 +76,15 @@ contract ScoreManager is IScoreManager, Ownable {
     function setCirqaToken(address _cirqaToken) external onlyOwner {
         require(_cirqaToken != address(0), "Invalid address");
         cirqaToken = ICirqaToken(_cirqaToken);
+    }
+    
+    /**
+     * @dev Sets the Scholarship Manager contract for auto-freeze functionality
+     * @param _scholarshipManager Address of the Scholarship Manager contract
+     */
+    function setScholarshipManager(address _scholarshipManager) external onlyOwner {
+        require(_scholarshipManager != address(0), "Invalid address");
+        scholarshipManager = IScholarshipManager(_scholarshipManager);
     }
     
     /**
@@ -131,6 +145,9 @@ contract ScoreManager is IScoreManager, Ownable {
         
         // Update top rated scholarships
         updateTopRatedScholarships(tokenId);
+        
+        // Auto-update freeze status based on new score
+        autoUpdateFreezeStatus(tokenId);
         
         emit ScholarshipRated(tokenId, msg.sender, score, amount);
     }
@@ -236,5 +253,32 @@ contract ScoreManager is IScoreManager, Ownable {
     function getInvestorRating(uint256 tokenId, address investor) external view returns (uint8 score, uint256 tokens, uint256 timestamp) {
         Rating storage rating = scores[tokenId].ratingsByInvestor[investor];
         return (rating.score, rating.tokens, rating.timestamp);
+    }
+    
+    /**
+     * @dev Automatically updates freeze status based on current score
+     * @param tokenId The ID of the scholarship NFT
+     * @notice This is called automatically after each rating
+     */
+    function autoUpdateFreezeStatus(uint256 tokenId) private {
+        // Only proceed if ScholarshipManager is set
+        if (address(scholarshipManager) == address(0)) {
+            return;
+        }
+        
+        uint256 currentScore = getScholarshipScore(tokenId);
+        
+        // Only check freeze status if scholarship has been rated (score > 0)
+        if (currentScore > 0) {
+            // Threshold is 3.0 with 2 decimal precision = 300
+            bool shouldFreeze = currentScore < 300;
+            bool currentlyFrozen = scholarshipManager.isFrozen(tokenId);
+            
+            // Only update if status needs to change
+            if (shouldFreeze != currentlyFrozen) {
+                scholarshipManager.updateFreezeStatus(tokenId);
+                emit AutoFreezeStatusUpdated(tokenId, shouldFreeze, currentScore);
+            }
+        }
     }
 }

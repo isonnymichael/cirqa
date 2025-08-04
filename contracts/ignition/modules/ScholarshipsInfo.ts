@@ -1,9 +1,10 @@
 /**
- * 🎓 SCHOLARSHIP DEBUG SCRIPT
+ * 🎓 COMPREHENSIVE SCHOLARSHIP ANALYSIS SCRIPT
  * 
- * This script provides comprehensive debugging information for all scholarships
- * in the Cirqa protocol. It displays detailed information about each scholarship
- * including NFT data, financial status, scores, ratings, and withdrawal history.
+ * This script provides comprehensive debugging and analysis information for all 
+ * scholarships in the Cirqa protocol. It displays detailed information about 
+ * each scholarship including new features like investor tracking, auto-freeze 
+ * system, and withdrawal fee transparency.
  * 
  * USAGE:
  * 1. Set environment variable: CIRQA_CORE=0x[your_core_contract_address]
@@ -13,16 +14,25 @@
  * CIRQA_CORE=0x... npx hardhat run ignition/modules/ScholarshipsInfo.ts
  * 
  * DISPLAYS:
- * - Protocol overview and settings
- * - Total scholarship statistics  
+ * - Protocol overview and auto-freeze settings
+ * - Total scholarship statistics with new metrics
  * - Individual scholarship details:
  *   • NFT information (owner, metadata)
- *   • Financial data (balance, funded, withdrawn)
- *   • Score and rating information
- *   • Withdrawal history
- *   • CIRQA rewards
- * - Summary statistics
+ *   • Financial data (balance, funding, withdrawals, fees)
+ *   • 👥 Investor tracking (contributors, amounts, percentages)
+ *   • 📤 Detailed withdrawal history (net amounts, fees, dates)
+ *   • ⭐ Score & rating information with freeze status
+ *   • 🔒 Auto-freeze system status and analysis
+ *   • 🎁 CIRQA rewards distribution
+ * - Enhanced summary statistics (frozen rate, utilization, etc.)
  * - Network information
+ * 
+ * NEW FEATURES COVERED:
+ * ✅ Investor transparency and tracking
+ * ✅ Withdrawal fee breakdown and history
+ * ✅ Auto-freeze based on performance scores (<3.0)
+ * ✅ Real-time freeze status validation
+ * ✅ Enhanced financial analytics
  */
 
 import { ethers } from "hardhat";
@@ -69,6 +79,13 @@ async function main() {
     const protocolFee = await core.protocolFee();
     console.log("Reward Rate:", ethers.formatUnits(rewardRate, 18), "CIRQA per USDT");
     console.log("Protocol Fee:", (Number(protocolFee) / 100).toFixed(2), "%");
+    
+    // Auto-freeze configuration
+    console.log("\n❄️  AUTO-FREEZE SYSTEM");
+    console.log("Freeze Threshold: 3.00/10.00");
+    console.log("Auto-freeze: ✅ Enabled");
+    console.log("Trigger: After each rating submission");
+    console.log("Benefits: Protects investors from poor-performing scholarships");
 
     // ============ REWARD CALCULATION DEBUG ============
     console.log("\n🧮 REWARD CALCULATION DEBUG");
@@ -142,42 +159,128 @@ async function main() {
         // ===== FINANCIAL INFO =====
         console.log("\n💰 Financial Information:");
         try {
-          const scholarshipData = await scholarshipManager.getScholarshipData(tokenId);
-          console.log(`   Current Balance: ${ethers.formatUnits(scholarshipData.currentBalance, 6)} USDT`);
-          console.log(`   Total Funded: ${ethers.formatUnits(scholarshipData.totalFunded, 6)} USDT`);
-          console.log(`   Total Withdrawn: ${ethers.formatUnits(scholarshipData.totalWithdrawn, 6)} USDT`);
-          console.log(`   Creation Timestamp: ${new Date(Number(scholarshipData.createdAt) * 1000).toLocaleString()}`);
+          const [student, balance, metadata, frozen] = await scholarshipManager.getScholarshipData(tokenId);
+          const totalFunding = await scholarshipManager.getTotalFunding(tokenId);
+          const investorCount = await scholarshipManager.getInvestorCount(tokenId);
+          
+          console.log(`   Student: ${student}`);
+          console.log(`   Current Balance: ${ethers.formatUnits(balance, 6)} USDT`);
+          console.log(`   Total Funding Received: ${ethers.formatUnits(totalFunding, 6)} USDT`);
+          console.log(`   Number of Investors: ${investorCount}`);
+          
+          // Calculate total withdrawn from withdrawal history
+          const [netAmounts, timestamps, feeAmounts] = await scholarshipManager.getDetailedWithdrawalHistory(tokenId);
+          let totalWithdrawn = BigInt(0);
+          let totalFees = BigInt(0);
+          
+          for (let i = 0; i < netAmounts.length; i++) {
+            totalWithdrawn += netAmounts[i];
+            totalFees += feeAmounts[i];
+          }
+          
+          console.log(`   Total Withdrawn: ${ethers.formatUnits(totalWithdrawn, 6)} USDT`);
+          console.log(`   Total Fees Paid: ${ethers.formatUnits(totalFees, 6)} USDT`);
+          console.log(`   Withdrawal Count: ${netAmounts.length}`);
 
           // Calculate scholarship status
-          const currentBalance = Number(ethers.formatUnits(scholarshipData.currentBalance, 6));
-          const totalFunded = Number(ethers.formatUnits(scholarshipData.totalFunded, 6));
+          const currentBalance = Number(ethers.formatUnits(balance, 6));
+          const totalFunded = Number(ethers.formatUnits(totalFunding, 6));
           
           let status = "🔴 Unfunded";
-          if (currentBalance > 0) {
-            status = "🟢 Available for Funding";
+          let statusEmoji = "🔴";
+          
+          if (frozen) {
+            status = "🔒 FROZEN (Low Performance Score)";
+            statusEmoji = "🔒";
+          } else if (currentBalance > 0) {
+            status = "🟢 Active & Available";
+            statusEmoji = "🟢";
           } else if (totalFunded > 0) {
             status = "🟡 Fully Withdrawn";
+            statusEmoji = "🟡";
           }
+          
           console.log(`   Status: ${status}`);
+          console.log(`   Freeze Status: ${frozen ? "🔒 FROZEN" : "✅ Active"}`);
 
         } catch (error) {
           console.log(`   ❌ Could not get financial data: ${error instanceof Error ? error.message : String(error)}`);
         }
 
+        // ===== INVESTOR INFORMATION =====
+        console.log("\n👥 Investor Information:");
+        try {
+          const investors = await scholarshipManager.getInvestors(tokenId);
+          const investorCount = await scholarshipManager.getInvestorCount(tokenId);
+          const totalFunding = await scholarshipManager.getTotalFunding(tokenId);
+          
+          if (investors.length > 0) {
+            console.log(`   Total Investors: ${investorCount}`);
+            console.log(`   Total Funding: ${ethers.formatUnits(totalFunding, 6)} USDT`);
+            console.log(`   Top Contributors:`);
+            
+            // Get contributions and sort by amount
+            const investorData = [];
+            for (const investor of investors) {
+              const contribution = await scholarshipManager.getInvestorContribution(tokenId, investor);
+              investorData.push({ address: investor, amount: contribution });
+            }
+            
+            // Sort by contribution amount (descending)
+            investorData.sort((a, b) => Number(b.amount - a.amount));
+            
+            // Show top 5 investors
+            investorData.slice(0, 5).forEach((inv, idx) => {
+              const percentage = Number(inv.amount) * 100 / Number(totalFunding);
+              console.log(`      #${idx + 1}: ${inv.address}`);
+              console.log(`           ${ethers.formatUnits(inv.amount, 6)} USDT (${percentage.toFixed(1)}%)`);
+            });
+            
+            if (investors.length > 5) {
+              console.log(`      ... and ${investors.length - 5} more investors`);
+            }
+          } else {
+            console.log(`   💰 No investors yet - scholarship needs funding`);
+          }
+        } catch (error) {
+          console.log(`   ❌ Could not get investor data: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
         // ===== WITHDRAWAL HISTORY =====
         console.log("\n📤 Withdrawal History:");
         try {
-          const withdrawalHistory = await scholarshipManager.getWithdrawalHistory(tokenId);
-          if (withdrawalHistory.length > 0) {
-            console.log(`   Total Withdrawals: ${withdrawalHistory.length}`);
-            withdrawalHistory.slice(0, 3).forEach((withdrawal, idx) => {
-              console.log(`   #${idx + 1}: ${ethers.formatUnits(withdrawal.amount, 6)} USDT at ${new Date(Number(withdrawal.timestamp) * 1000).toLocaleString()}`);
-            });
-            if (withdrawalHistory.length > 3) {
-              console.log(`   ... and ${withdrawalHistory.length - 3} more withdrawals`);
+          const [netAmounts, timestamps, feeAmounts] = await scholarshipManager.getDetailedWithdrawalHistory(tokenId);
+          if (netAmounts.length > 0) {
+            console.log(`   Total Withdrawals: ${netAmounts.length}`);
+            
+            let totalWithdrawn = BigInt(0);
+            let totalFees = BigInt(0);
+            
+            for (let i = 0; i < Math.min(netAmounts.length, 5); i++) {
+              const date = new Date(Number(timestamps[i]) * 1000).toLocaleString();
+              const grossAmount = netAmounts[i] + feeAmounts[i];
+              console.log(`   #${i + 1}: ${ethers.formatUnits(netAmounts[i], 6)} USDT`);
+              console.log(`        Date: ${date}`);
+              console.log(`        Gross: ${ethers.formatUnits(grossAmount, 6)} USDT`);
+              console.log(`        Fee: ${ethers.formatUnits(feeAmounts[i], 6)} USDT`);
+              
+              totalWithdrawn += netAmounts[i];
+              totalFees += feeAmounts[i];
             }
+            
+            if (netAmounts.length > 5) {
+              // Calculate totals for remaining withdrawals
+              for (let i = 5; i < netAmounts.length; i++) {
+                totalWithdrawn += netAmounts[i];
+                totalFees += feeAmounts[i];
+              }
+              console.log(`   ... and ${netAmounts.length - 5} more withdrawals`);
+            }
+            
+            console.log(`   💸 Total Net Withdrawn: ${ethers.formatUnits(totalWithdrawn, 6)} USDT`);
+            console.log(`   🏦 Total Fees Paid: ${ethers.formatUnits(totalFees, 6)} USDT`);
           } else {
-            console.log(`   No withdrawals yet`);
+            console.log(`   📭 No withdrawals yet`);
           }
         } catch (error) {
           console.log(`   ❌ Could not get withdrawal history: ${error instanceof Error ? error.message : String(error)}`);
@@ -189,16 +292,36 @@ async function main() {
           const scholarshipScore = await scoreManager.getScholarshipScore(tokenId);
           const totalRatingTokens = await scoreManager.getTotalRatingTokens(tokenId);
           const ratingCount = await scoreManager.getRatingCount(tokenId);
+          const [student, balance, metadata, frozen] = await scholarshipManager.getScholarshipData(tokenId);
+          const shouldBeFrozen = await scholarshipManager.shouldBeFrozen(tokenId);
           
-          console.log(`   Average Score: ${(Number(scholarshipScore) / 100).toFixed(2)}/10`);
-          console.log(`   Total Ratings: ${ratingCount.toString()}`);
-          console.log(`   Total CIRQA Used: ${ethers.formatUnits(totalRatingTokens, 18)} CIRQA`);
-
-          if (Number(ratingCount) > 0) {
-            console.log(`   💡 Weighted by: ${ethers.formatUnits(totalRatingTokens, 18)} CIRQA tokens`);
+          if (Number(scholarshipScore) === 0) {
+            console.log(`   Score: No ratings yet ⚪`);
+            console.log(`   Status: Unrated (Active)`);
           } else {
-            console.log(`   📝 No ratings yet`);
+            const scoreDecimal = Number(scholarshipScore) / 100;
+            console.log(`   Average Score: ${scoreDecimal.toFixed(2)}/10.00`);
+            console.log(`   Total Ratings: ${ratingCount.toString()}`);
+            console.log(`   Total CIRQA Used: ${ethers.formatUnits(totalRatingTokens, 18)} CIRQA`);
+            console.log(`   💡 Token-weighted average`);
+            
+            // Performance status
+            if (scoreDecimal >= 3.0) {
+              console.log(`   Performance: ✅ Good (≥3.0)`);
+            } else {
+              console.log(`   Performance: ⚠️ Poor (<3.0)`);
+            }
           }
+          
+          // Freeze status analysis
+          console.log(`   Current Freeze Status: ${frozen ? "🔒 FROZEN" : "✅ Active"}`);
+          if (Number(scholarshipScore) > 0) {
+            console.log(`   Should Be Frozen: ${shouldBeFrozen ? "🔒 Yes" : "✅ No"}`);
+            if (frozen !== shouldBeFrozen) {
+              console.log(`   ⚠️  STATUS MISMATCH! Needs update.`);
+            }
+          }
+          
         } catch (error) {
           console.log(`   ❌ Could not get score data: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -230,20 +353,42 @@ async function main() {
     try {
       let totalFundedSum = BigInt(0);
       let totalWithdrawnSum = BigInt(0);
+      let totalFeesSum = BigInt(0);
       let totalCurrentBalance = BigInt(0);
       let scholarshipsWithRatings = 0;
       let totalRatings = BigInt(0);
       let activeScholarships = 0;
+      let frozenScholarships = 0;
+      let totalInvestors = 0;
 
       for (const tokenId of allScholarships) {
         try {
-          const scholarshipData = await scholarshipManager.getScholarshipData(tokenId);
-          totalFundedSum += scholarshipData.totalFunded;
-          totalWithdrawnSum += scholarshipData.totalWithdrawn;
-          totalCurrentBalance += scholarshipData.currentBalance;
+          const [student, balance, metadata, frozen] = await scholarshipManager.getScholarshipData(tokenId);
+          const totalFunding = await scholarshipManager.getTotalFunding(tokenId);
+          const investorCount = await scholarshipManager.getInvestorCount(tokenId);
           
-          if (scholarshipData.currentBalance > 0) {
+          // Calculate withdrawn amounts from detailed history
+          const [netAmounts, timestamps, feeAmounts] = await scholarshipManager.getDetailedWithdrawalHistory(tokenId);
+          let scholarshipWithdrawn = BigInt(0);
+          let scholarshipFees = BigInt(0);
+          
+          for (let i = 0; i < netAmounts.length; i++) {
+            scholarshipWithdrawn += netAmounts[i];
+            scholarshipFees += feeAmounts[i];
+          }
+          
+          totalFundedSum += totalFunding;
+          totalWithdrawnSum += scholarshipWithdrawn;
+          totalFeesSum += scholarshipFees;
+          totalCurrentBalance += balance;
+          totalInvestors += Number(investorCount);
+          
+          if (Number(balance) > 0) {
             activeScholarships++;
+          }
+          
+          if (frozen) {
+            frozenScholarships++;
           }
 
           const ratingCount = await scoreManager.getRatingCount(tokenId);
@@ -256,20 +401,37 @@ async function main() {
         }
       }
 
+      console.log(`📊 PROTOCOL STATISTICS`);
       console.log(`Total Scholarships: ${allScholarships.length}`);
       console.log(`Active (Funded) Scholarships: ${activeScholarships}`);
+      console.log(`Frozen Scholarships: ${frozenScholarships}`);
       console.log(`Scholarships with Ratings: ${scholarshipsWithRatings}`);
+      console.log(`Total Unique Investors: ${totalInvestors}`);
+      
+      console.log(`\n💰 FINANCIAL STATISTICS`);
       console.log(`Total USDT Funded: ${ethers.formatUnits(totalFundedSum, 6)} USDT`);
       console.log(`Total USDT Withdrawn: ${ethers.formatUnits(totalWithdrawnSum, 6)} USDT`);
+      console.log(`Total Fees Collected: ${ethers.formatUnits(totalFeesSum, 6)} USDT`);
       console.log(`Total Current Balance: ${ethers.formatUnits(totalCurrentBalance, 6)} USDT`);
       console.log(`Total Ratings Given: ${totalRatings.toString()}`);
 
       // Calculate percentages
       if (allScholarships.length > 0) {
         const activePercentage = (activeScholarships / allScholarships.length * 100).toFixed(1);
+        const frozenPercentage = (frozenScholarships / allScholarships.length * 100).toFixed(1);
         const ratedPercentage = (scholarshipsWithRatings / allScholarships.length * 100).toFixed(1);
+        const utilizedPercentage = Number(totalWithdrawnSum) > 0 ? (Number(totalWithdrawnSum) / Number(totalFundedSum) * 100).toFixed(1) : "0.0";
+        
+        console.log(`\n📈 PERFORMANCE METRICS`);
         console.log(`Active Rate: ${activePercentage}%`);
-        console.log(`Rating Rate: ${ratedPercentage}%`);
+        console.log(`Frozen Rate: ${frozenPercentage}%`);
+        console.log(`Rating Coverage: ${ratedPercentage}%`);
+        console.log(`Fund Utilization: ${utilizedPercentage}%`);
+        
+        if (totalInvestors > 0) {
+          const avgFundingPerInvestor = Number(totalFundedSum) / totalInvestors;
+          console.log(`Avg Funding per Investor: ${(avgFundingPerInvestor / 1e6).toFixed(2)} USDT`);
+        }
       }
 
     } catch (error) {
