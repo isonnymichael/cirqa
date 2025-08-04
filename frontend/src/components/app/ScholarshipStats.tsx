@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FaGraduationCap, FaDollarSign, FaUsers, FaChartLine } from 'react-icons/fa';
+import { FaGraduationCap, FaDollarSign, FaUsers, FaChartLine, FaSnowflake } from 'react-icons/fa';
 import { 
   getAllScholarships,
   getScholarshipData,
@@ -21,6 +21,7 @@ type ScholarshipMetrics = {
   totalFundingAmount: bigint;
   totalWithdrawals: bigint;
   activeScholarships: number;
+  frozenScholarships: number;
   studentsCount: number;
   isLoading: boolean;
   error: string | null;
@@ -32,6 +33,7 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', ref
     totalFundingAmount: BigInt(0),
     totalWithdrawals: BigInt(0),
     activeScholarships: 0,
+    frozenScholarships: 0,
     studentsCount: 0,
     isLoading: true,
     error: null
@@ -75,6 +77,7 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', ref
           totalFundingAmount: BigInt(0),
           totalWithdrawals: BigInt(0),
           activeScholarships: 0,
+          frozenScholarships: 0,
           studentsCount: 0,
           isLoading: false,
           error: null
@@ -97,6 +100,7 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', ref
       let totalFunding = BigInt(0);
       let totalWithdrawn = BigInt(0);
       let activeCount = 0;
+      let frozenCount = 0;
       const uniqueStudents = new Set<string>();
 
       validScholarshipData.forEach(data => {
@@ -104,8 +108,11 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', ref
           totalFunding += data.totalFunded;
           totalWithdrawn += data.totalWithdrawn;
           
-          // Count as active if has balance > 0
-          if (data.balance > BigInt(0)) {
+          // Count freeze status
+          if (data.frozen) {
+            frozenCount++;
+          } else if (data.balance > BigInt(0)) {
+            // Count as active if not frozen and has balance > 0
             activeCount++;
           }
           
@@ -119,6 +126,7 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', ref
         totalFundingAmount: totalFunding,
         totalWithdrawals: totalWithdrawn,
         activeScholarships: activeCount,
+        frozenScholarships: frozenCount,
         studentsCount: uniqueStudents.size,
         isLoading: false,
         error: null
@@ -174,7 +182,7 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', ref
         </h2>
       </div>
       
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1 md:gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-1 md:gap-2">
         {/* Total Scholarships - Integer count with commas */}
         <div className="bg-blue-900/20 rounded p-1.5 md:p-2 text-center">
           <FaGraduationCap className="text-blue-400 text-xs mx-auto mb-1" />
@@ -200,6 +208,15 @@ const ScholarshipStats: React.FC<ScholarshipStatsProps> = ({ className = '', ref
             {metrics.isLoading ? <div className="text-center"><Spinner size="sm" /></div> : formatInteger(metrics.activeScholarships)}
           </div>
           <div className="text-xs text-gray-500">Active</div>
+        </div>
+        
+        {/* Frozen Scholarships - Integer count with commas */}
+        <div className="bg-red-900/20 rounded p-1.5 md:p-2 text-center">
+          <FaSnowflake className="text-red-400 text-xs mx-auto mb-1" />
+          <div className="text-xs md:text-sm font-bold text-red-400">
+            {metrics.isLoading ? <div className="text-center"><Spinner size="sm" /></div> : formatInteger(metrics.frozenScholarships)}
+          </div>
+          <div className="text-xs text-gray-500">Frozen</div>
         </div>
         
         {/* Unique Students - Integer count with commas */}

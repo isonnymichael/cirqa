@@ -8,6 +8,7 @@ export type FilterOptions = {
   minScore: string;
   sortBy: 'id' | 'balance' | 'score';
   sortOrder: 'asc' | 'desc';
+  freezeStatus: 'all' | 'frozen' | 'active';
 };
 
 type ScholarshipFilterProps = {
@@ -26,7 +27,8 @@ const ScholarshipFilter: React.FC<ScholarshipFilterProps> = ({
     minBalance: '0',
     minScore: '0',
     sortBy: 'id',
-    sortOrder: 'desc'
+    sortOrder: 'desc',
+    freezeStatus: 'all'
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -47,7 +49,8 @@ const ScholarshipFilter: React.FC<ScholarshipFilterProps> = ({
         minBalance: '0',
         minScore: '0',
         sortBy: 'id' as const,
-        sortOrder: 'desc' as const
+        sortOrder: 'desc' as const,
+        freezeStatus: 'all' as const
       };
       setFilters(defaultFilters);
       onFilterChange(defaultFilters);
@@ -84,6 +87,20 @@ const ScholarshipFilter: React.FC<ScholarshipFilterProps> = ({
           />
           <span className="text-gray-300">Mine</span>
         </label>
+
+        {/* Freeze status filter */}
+        <div className="flex items-center">
+          <span className="text-gray-400 mr-1">Status:</span>
+          <select
+            value={filters.freezeStatus}
+            onChange={(e) => handleFilterChange('freezeStatus', e.target.value)}
+            className="cursor-pointer bg-gray-700 border border-gray-600 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 text-white"
+          >
+            <option value="all">All</option>
+            <option value="active">🟢 Active</option>
+            <option value="frozen">🧊 Frozen</option>
+          </select>
+        </div>
 
         {/* Minimum balance input */}
         <div className="flex items-center">

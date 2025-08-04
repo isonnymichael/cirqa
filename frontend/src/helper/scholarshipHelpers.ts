@@ -11,11 +11,31 @@ export interface ScholarshipData {
     balance: bigint;
     totalFunded: bigint;
     totalWithdrawn: bigint;
+    frozen: boolean; // New field for freeze status
 }
 
 export interface WithdrawalHistory {
     amounts: bigint[];
     timestamps: bigint[];
+}
+
+// New types for enhanced withdrawal history
+export interface DetailedWithdrawalHistory {
+    netAmounts: bigint[];
+    timestamps: bigint[];
+    feeAmounts: bigint[];
+}
+
+// New types for investor tracking
+export interface InvestorInfo {
+    address: string;
+    contribution: bigint;
+}
+
+export interface ScholarshipFunding {
+    totalFunding: bigint;
+    investorCount: number;
+    investors: string[];
 }
 
 export interface CreateScholarshipParams {
@@ -421,13 +441,13 @@ export async function getScholarshipOwner(tokenId: number): Promise<string> {
 }
 
 /**
- * Get complete scholarship data (student, balance, metadata)
+ * Get complete scholarship data (student, balance, metadata, frozen status)
  */
 export async function getScholarshipData(tokenId: number): Promise<ScholarshipData> {
     try {
-        const [student, balance, metadata] = await readContract({
+        const [student, balance, metadata, frozen] = await readContract({
             contract: scholarshipManagerContract,
-            method: "function getScholarshipData(uint256 tokenId) view returns (address, uint256, string)",
+            method: "function getScholarshipData(uint256 tokenId) view returns (address, uint256, string, bool)",
             params: [BigInt(tokenId)]
         });
 
@@ -444,10 +464,338 @@ export async function getScholarshipData(tokenId: number): Promise<ScholarshipDa
             metadata: metadata as string,
             balance: balance as bigint,
             totalFunded,
-            totalWithdrawn
+            totalWithdrawn,
+            frozen: frozen as boolean
         };
     } catch (error) {
         console.error('Error getting scholarship data:', error);
         throw new Error(`Failed to get scholarship data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+// ===== NEW INVESTOR TRACKING FUNCTIONS =====
+
+/**
+ * Get all investors who have funded a scholarship
+ */
+export async function getScholarshipInvestors(tokenId: number): Promise<string[]> {
+    try {
+        const investors = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function getInvestors(uint256 tokenId) view returns (address[])",
+            params: [BigInt(tokenId)]
+        });
+
+        return investors as string[];
+    } catch (error) {
+        console.error('Error getting scholarship investors:', error);
+        throw new Error(`Failed to get investors: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Get the contribution amount of a specific investor for a scholarship
+ */
+export async function getInvestorContribution(tokenId: number, investorAddress: string): Promise<bigint> {
+    try {
+        const contribution = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function getInvestorContribution(uint256 tokenId, address investor) view returns (uint256)",
+            params: [BigInt(tokenId), investorAddress]
+        });
+
+        return contribution;
+    } catch (error) {
+        console.error('Error getting investor contribution:', error);
+        throw new Error(`Failed to get investor contribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Get total funding received by a scholarship
+ */
+export async function getTotalScholarshipFunding(tokenId: number): Promise<bigint> {
+    try {
+        const totalFunding = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function getTotalFunding(uint256 tokenId) view returns (uint256)",
+            params: [BigInt(tokenId)]
+        });
+
+        return totalFunding;
+    } catch (error) {
+        console.error('Error getting total scholarship funding:', error);
+        throw new Error(`Failed to get total funding: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Get the number of investors for a scholarship
+ */
+export async function getInvestorCount(tokenId: number): Promise<number> {
+    try {
+        const count = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function getInvestorCount(uint256 tokenId) view returns (uint256)",
+            params: [BigInt(tokenId)]
+        });
+
+        return Number(count);
+    } catch (error) {
+        console.error('Error getting investor count:', error);
+        throw new Error(`Failed to get investor count: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Get comprehensive funding information for a scholarship
+ */
+export async function getScholarshipFundingInfo(tokenId: number): Promise<ScholarshipFunding> {
+    try {
+        const [investors, totalFunding, investorCount] = await Promise.all([
+            getScholarshipInvestors(tokenId),
+            getTotalScholarshipFunding(tokenId),
+            getInvestorCount(tokenId)
+        ]);
+
+        return {
+            totalFunding,
+            investorCount,
+            investors
+        };
+    } catch (error) {
+        console.error('Error getting scholarship funding info:', error);
+        throw new Error(`Failed to get funding info: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Get detailed investor information with contributions
+ */
+export async function getDetailedInvestorInfo(tokenId: number): Promise<InvestorInfo[]> {
+    try {
+        const investors = await getScholarshipInvestors(tokenId);
+        
+        const investorDetails = await Promise.all(
+            investors.map(async (address) => {
+                const contribution = await getInvestorContribution(tokenId, address);
+                return { address, contribution };
+            })
+        );
+
+        return investorDetails;
+    } catch (error) {
+        console.error('Error getting detailed investor info:', error);
+        throw new Error(`Failed to get detailed investor info: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+// ===== NEW FREEZE MANAGEMENT FUNCTIONS =====
+
+/**
+ * Check if a scholarship is frozen
+ */
+export async function isScholarshipFrozen(tokenId: number): Promise<boolean> {
+    try {
+        const frozen = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function isFrozen(uint256 tokenId) view returns (bool)",
+            params: [BigInt(tokenId)]
+        });
+
+        return frozen;
+    } catch (error) {
+        console.error('Error checking if scholarship is frozen:', error);
+        throw new Error(`Failed to check freeze status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Check if a scholarship should be frozen based on its score
+ */
+export async function shouldScholarshipBeFrozen(tokenId: number): Promise<boolean> {
+    try {
+        const shouldBeFrozen = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function shouldBeFrozen(uint256 tokenId) view returns (bool)",
+            params: [BigInt(tokenId)]
+        });
+
+        return shouldBeFrozen;
+    } catch (error) {
+        console.error('Error checking if scholarship should be frozen:', error);
+        throw new Error(`Failed to check should be frozen: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+// ===== NEW ENHANCED WITHDRAWAL HISTORY FUNCTIONS =====
+
+/**
+ * Get detailed withdrawal history with fee information
+ */
+export async function getDetailedWithdrawalHistory(tokenId: number): Promise<DetailedWithdrawalHistory> {
+    try {
+        const [netAmounts, timestamps, feeAmounts] = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function getDetailedWithdrawalHistory(uint256 tokenId) view returns (uint256[], uint256[], uint256[])",
+            params: [BigInt(tokenId)]
+        });
+
+        return {
+            netAmounts: netAmounts as bigint[],
+            timestamps: timestamps as bigint[],
+            feeAmounts: feeAmounts as bigint[]
+        };
+    } catch (error) {
+        console.error('Error getting detailed withdrawal history:', error);
+        throw new Error(`Failed to get detailed withdrawal history: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Get withdrawal fee for a specific withdrawal
+ */
+export async function getWithdrawalFee(tokenId: number, withdrawalIndex: number): Promise<bigint> {
+    try {
+        const fee = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function getWithdrawalFee(uint256 tokenId, uint256 index) view returns (uint256)",
+            params: [BigInt(tokenId), BigInt(withdrawalIndex)]
+        });
+
+        return fee;
+    } catch (error) {
+        console.error('Error getting withdrawal fee:', error);
+        throw new Error(`Failed to get withdrawal fee: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Get comprehensive withdrawal statistics
+ */
+export async function getWithdrawalStats(tokenId: number): Promise<{
+    totalWithdrawals: number;
+    totalNetAmount: bigint;
+    totalFees: bigint;
+    averageFeeRate: number; // As percentage
+}> {
+    try {
+        const detailedHistory = await getDetailedWithdrawalHistory(tokenId);
+        
+        const totalWithdrawals = detailedHistory.netAmounts.length;
+        const totalNetAmount = detailedHistory.netAmounts.reduce((sum, amount) => sum + amount, BigInt(0));
+        const totalFees = detailedHistory.feeAmounts.reduce((sum, fee) => sum + fee, BigInt(0));
+        
+        // Calculate average fee rate as percentage
+        const totalGrossAmount = totalNetAmount + totalFees;
+        const averageFeeRate = totalGrossAmount > 0 
+            ? Number(totalFees * BigInt(10000) / totalGrossAmount) / 100 // Convert to percentage with 2 decimal places
+            : 0;
+
+        return {
+            totalWithdrawals,
+            totalNetAmount,
+            totalFees,
+            averageFeeRate
+        };
+    } catch (error) {
+        console.error('Error getting withdrawal stats:', error);
+        return {
+            totalWithdrawals: 0,
+            totalNetAmount: BigInt(0),
+            totalFees: BigInt(0),
+            averageFeeRate: 0
+        };
+    }
+}
+
+// ===== SCHOLARSHIP DELETION FUNCTIONS =====
+
+/**
+ * Check if a scholarship can be deleted
+ */
+export async function canDeleteScholarship(tokenId: number): Promise<boolean> {
+    try {
+        const canDelete = await readContract({
+            contract: scholarshipManagerContract,
+            method: "function canDeleteScholarship(uint256 tokenId) view returns (bool)",
+            params: [BigInt(tokenId)]
+        });
+
+        return canDelete;
+    } catch (error) {
+        console.error('Error checking if scholarship can be deleted:', error);
+        throw new Error(`Failed to check delete eligibility: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Delete a scholarship (only owner can delete)
+ */
+export async function deleteScholarship(params: {
+    tokenId: number;
+    account: any;
+}): Promise<{
+    success: boolean;
+    transactionHash?: string;
+    error?: string;
+}> {
+    const { tokenId, account } = params;
+
+    try {
+        if (!account) {
+            throw new Error('No account connected');
+        }
+
+        // First check if scholarship can be deleted
+        const canDelete = await canDeleteScholarship(tokenId);
+        if (!canDelete) {
+            throw new Error('Cannot delete scholarship: it has funding, ratings, or withdrawals');
+        }
+
+        // Prepare the delete transaction
+        const transaction = prepareContractCall({
+            contract: cirqaCore,
+            method: "function deleteScholarship(uint256 tokenId)",
+            params: [BigInt(tokenId)]
+        });
+
+        // Send the transaction
+        const { transactionHash } = await sendTransaction({
+            transaction,
+            account
+        });
+
+        // Wait for confirmation
+        const receipt = await waitForReceipt({
+            client,
+            chain,
+            transactionHash
+        });
+
+        if (receipt.status === 'success') {
+            console.log(`✅ Scholarship ${tokenId} deleted successfully`);
+            return {
+                success: true,
+                transactionHash
+            };
+        } else {
+            throw new Error('Transaction failed');
+        }
+
+    } catch (error: any) {
+        console.error('Error deleting scholarship:', error);
+        
+        let errorMessage = 'Unknown error occurred';
+        if (error?.message) {
+            errorMessage = error.message;
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        }
+
+        return {
+            success: false,
+            error: errorMessage
+        };
     }
 }

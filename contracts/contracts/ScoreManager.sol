@@ -256,6 +256,15 @@ contract ScoreManager is IScoreManager, Ownable {
     }
     
     /**
+     * @dev Checks if a scholarship has any ratings
+     * @param tokenId The ID of the scholarship NFT
+     * @return True if scholarship has any ratings
+     */
+    function hasRatings(uint256 tokenId) external view returns (bool) {
+        return scores[tokenId].ratingCount > 0;
+    }
+    
+    /**
      * @dev Automatically updates freeze status based on current score
      * @param tokenId The ID of the scholarship NFT
      * @notice This is called automatically after each rating

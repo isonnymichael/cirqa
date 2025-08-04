@@ -157,8 +157,8 @@ const RatingModal: React.FC<RatingModalProps> = ({
               <div className="text-center">
                 <p className="text-gray-400 text-xs md:text-sm">Score</p>
                 <div className="flex items-center space-x-1">
-                  <span className="text-xl md:text-2xl font-bold text-yellow-400">{score}</span>
-                  <span className="text-yellow-400">⭐</span>
+                  <span className={`text-xl md:text-2xl font-bold ${score && score < 3 ? 'text-red-400' : 'text-yellow-400'}`}>{score}</span>
+                  <span className={score && score < 3 ? 'text-red-400' : 'text-yellow-400'}>⭐</span>
                 </div>
               </div>
               
@@ -176,6 +176,22 @@ const RatingModal: React.FC<RatingModalProps> = ({
               </p>
             </div>
           </div>
+          
+          {/* Low Rating Warning in Confirm Step */}
+          {score !== null && score < 3 && (
+            <div className="mb-4 p-3 bg-red-900/20 border border-red-600 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <span className="text-red-400 text-lg flex-shrink-0">⚠️</span>
+                <div>
+                  <p className="text-red-400 font-medium text-sm">Low Rating Warning</p>
+                  <p className="text-red-300 text-xs mt-1 leading-relaxed">
+                    You're submitting a low rating ({score}/10). This may contribute to freezing the scholarship 
+                    if the total average drops below 3.0.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {error && (
             <div className="bg-red-900/20 border border-red-800 rounded p-2 md:p-3 mb-3 md:mb-4">
@@ -252,14 +268,20 @@ const RatingModal: React.FC<RatingModalProps> = ({
                   title={
                     !canAfford 
                       ? `Need ${formatCurrency(requiredTokens, 18, '', 2)} CIRQA` 
+                      : rating < 3
+                      ? `⚠️ Low rating (${rating}/10) - May cause scholarship freeze if total average < 3.0`
                       : `Requires ${formatCurrency(requiredTokens, 18, '', 2)} CIRQA`
                   }
                   className={`aspect-square rounded-lg border-2 transition-all text-xs font-bold ${
                     isSelected
-                      ? 'border-yellow-400 bg-yellow-400/20 text-yellow-400'
-                      : canAfford
-                      ? 'cursor-pointer border-gray-600 hover:border-gray-500 text-gray-400 hover:text-gray-300'
-                      : 'border-red-600 bg-red-900/20 text-red-400 cursor-not-allowed opacity-50'
+                      ? rating < 3
+                        ? 'border-red-400 bg-red-400/20 text-red-400'
+                        : 'border-yellow-400 bg-yellow-400/20 text-yellow-400'
+                      : !canAfford
+                      ? 'border-red-600 bg-red-900/20 text-red-400 cursor-not-allowed opacity-50'
+                      : rating < 3
+                      ? 'cursor-pointer border-orange-500 hover:border-red-400 text-orange-400 hover:text-red-400 bg-orange-900/10 hover:bg-red-900/20'
+                      : 'cursor-pointer border-gray-600 hover:border-gray-500 text-gray-400 hover:text-gray-300'
                   }`}
                 >
                   {rating}
@@ -270,13 +292,29 @@ const RatingModal: React.FC<RatingModalProps> = ({
           <div className="flex justify-center mt-2">
             {score !== null ? (
               <div className="flex items-center space-x-1">
-                <span className="text-xl md:text-2xl font-bold text-yellow-400">{score}</span>
-                <span className="text-yellow-400">⭐</span>
+                <span className={`text-xl md:text-2xl font-bold ${score < 3 ? 'text-red-400' : 'text-yellow-400'}`}>{score}</span>
+                <span className={score < 3 ? 'text-red-400' : 'text-yellow-400'}>⭐</span>
               </div>
             ) : (
               <div className="text-gray-400 text-sm">No rating selected</div>
             )}
           </div>
+          
+          {/* Low Rating Warning */}
+          {score !== null && score < 3 && (
+            <div className="mt-3 p-3 bg-red-900/20 border border-red-600 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <span className="text-red-400 text-lg flex-shrink-0">⚠️</span>
+                <div>
+                  <p className="text-red-400 font-medium text-sm">Low Rating Warning</p>
+                  <p className="text-red-300 text-xs mt-1 leading-relaxed">
+                    Rating {score}/10 is below the freeze threshold. If the scholarship's total average score drops below 3.0, 
+                    it will be automatically frozen (funding and withdrawals disabled) until the average improves.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* CIRQA Amount */}

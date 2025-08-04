@@ -149,4 +149,20 @@ interface IScholarshipManager {
      * @return Whether the scholarship is frozen
      */
     function isFrozen(uint256 tokenId) external view returns (bool);
+    
+    // === SCHOLARSHIP DELETION FUNCTIONS ===
+    
+    /**
+     * @dev Checks if a scholarship can be deleted
+     * @param tokenId The ID of the scholarship NFT
+     * @return True if scholarship can be deleted (no funding, ratings, or withdrawals)
+     */
+    function canDeleteScholarship(uint256 tokenId) external view returns (bool);
+    
+    /**
+     * @dev Cleans up all data associated with a scholarship
+     * @param tokenId The ID of the scholarship NFT
+     * @notice Only callable by Core contract
+     */
+    function cleanupScholarship(uint256 tokenId) external;
 }

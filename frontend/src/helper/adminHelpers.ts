@@ -1,6 +1,6 @@
 import { prepareContractCall, sendTransaction, readContract } from 'thirdweb';
 import { Account } from 'thirdweb/wallets';
-import { cirqaCore } from '@/lib/contracts';
+import { cirqaCore, scholarshipManagerContract } from '@/lib/contracts';
 
 // Types for admin operations
 export interface UpdateProtocolParams {
@@ -25,6 +25,15 @@ export interface SetScholarshipManagerParams extends UpdateProtocolParams {
 
 export interface SetScoreManagerParams extends UpdateProtocolParams {
     scoreManager: string;
+}
+
+export interface SetFrozenStatusParams extends UpdateProtocolParams {
+    tokenId: number;
+    frozen: boolean;
+}
+
+export interface UpdateFreezeStatusParams extends UpdateProtocolParams {
+    tokenId: number;
 }
 
 /**
@@ -339,5 +348,119 @@ export async function getProtocolConfig(): Promise<{
     } catch (error) {
         console.error('Error getting protocol config:', error);
         throw new Error(`Failed to get protocol config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+// ===== NEW FREEZE MANAGEMENT FUNCTIONS (ADMIN ONLY) =====
+
+/**
+ * Manually set the frozen status of a scholarship (only owner)
+ */
+export async function setScholarshipFrozenStatus(params: SetFrozenStatusParams): Promise<string> {
+    try {
+        const { tokenId, frozen, account } = params;
+
+        const transaction = prepareContractCall({
+            contract: scholarshipManagerContract,
+            method: "function setFrozenStatus(uint256 tokenId, bool frozen) external",
+            params: [BigInt(tokenId), frozen]
+        });
+
+        const result = await sendTransaction({
+            transaction,
+            account
+        });
+
+        return result.transactionHash;
+    } catch (error) {
+        console.error('Error setting scholarship frozen status:', error);
+        throw new Error(`Failed to set frozen status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Update the freeze status of a scholarship based on its current score (via Core contract)
+ */
+export async function updateScholarshipFreezeStatus(params: UpdateFreezeStatusParams): Promise<string> {
+    try {
+        const { tokenId, account } = params;
+
+        const transaction = prepareContractCall({
+            contract: cirqaCore,
+            method: "function updateScholarshipFreezeStatus(uint256 tokenId) external",
+            params: [BigInt(tokenId)]
+        });
+
+        const result = await sendTransaction({
+            transaction,
+            account
+        });
+
+        return result.transactionHash;
+    } catch (error) {
+        console.error('Error updating scholarship freeze status:', error);
+        throw new Error(`Failed to update freeze status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Get the freeze threshold score (minimum score before auto-freeze)
+ */
+export async function getFreezeThreshold(): Promise<number> {
+    try {
+        // The freeze threshold is hardcoded in the contract as 3.0 (300 in basis points)
+        // But we can add a function to read it if needed in the future
+        return 3.0;
+    } catch (error) {
+        console.error('Error getting freeze threshold:', error);
+        return 3.0; // Default fallback
+    }
+}
+
+/**
+ * Get comprehensive freeze status information for multiple scholarships
+ */
+export async function getBatchFreezeStatus(tokenIds: number[]): Promise<{
+    tokenId: number;
+    frozen: boolean;
+    shouldBeFrozen: boolean;
+}[]> {
+    try {
+        const results = await Promise.all(
+            tokenIds.map(async (tokenId) => {
+                try {
+                    const [frozen, shouldBeFrozen] = await Promise.all([
+                        readContract({
+                            contract: scholarshipManagerContract,
+                            method: "function isFrozen(uint256 tokenId) view returns (bool)",
+                            params: [BigInt(tokenId)]
+                        }),
+                        readContract({
+                            contract: scholarshipManagerContract,
+                            method: "function shouldBeFrozen(uint256 tokenId) view returns (bool)",
+                            params: [BigInt(tokenId)]
+                        })
+                    ]);
+
+                    return {
+                        tokenId,
+                        frozen: frozen as boolean,
+                        shouldBeFrozen: shouldBeFrozen as boolean
+                    };
+                } catch (error) {
+                    console.warn(`Error getting freeze status for scholarship ${tokenId}:`, error);
+                    return {
+                        tokenId,
+                        frozen: false,
+                        shouldBeFrozen: false
+                    };
+                }
+            })
+        );
+
+        return results;
+    } catch (error) {
+        console.error('Error getting batch freeze status:', error);
+        throw new Error(`Failed to get batch freeze status: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }

@@ -38,6 +38,7 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
     event ScholarshipCreated(uint256 indexed tokenId, address indexed student, string metadata);
     event ScholarshipFunded(uint256 indexed tokenId, address indexed investor, uint256 amount);
     event FundsWithdrawn(uint256 indexed tokenId, address indexed student, uint256 amount);
+    event ScholarshipDeleted(uint256 indexed tokenId, address indexed student);
     event USDTContractUpdated(address indexed oldContract, address indexed newContract);
     event ScholarshipManagerUpdated(address indexed oldManager, address indexed newManager);
     event ScoreManagerUpdated(address indexed oldManager, address indexed newManager);
@@ -173,6 +174,30 @@ contract Core is ERC721, ERC721URIStorage, Ownable {
         protocolFee = newFee;
     }
     
+    /**
+     * @dev Deletes a scholarship NFT and all associated data
+     * @param tokenId The ID of the scholarship NFT to delete
+     * @notice Only the owner (student) can delete their scholarship
+     * @notice Can only delete if no funding, ratings, or withdrawals have occurred
+     */
+    function deleteScholarship(uint256 tokenId) external {
+        require(_exists(tokenId), "Scholarship does not exist");
+        require(ownerOf(tokenId) == msg.sender, "Only scholarship owner can delete");
+        
+        // Check if scholarship can be deleted (no activity)
+        require(scholarshipManager.canDeleteScholarship(tokenId), "Cannot delete scholarship with activity");
+        
+        address student = ownerOf(tokenId);
+        
+        // Clean up data in ScholarshipManager
+        scholarshipManager.cleanupScholarship(tokenId);
+        
+        // Burn the NFT
+        _burn(tokenId);
+        
+        emit ScholarshipDeleted(tokenId, student);
+    }
+
     /**
      * @dev Updates freeze status for a scholarship based on current score
      * @param tokenId The ID of the scholarship NFT

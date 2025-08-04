@@ -13,6 +13,7 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
     // Events
     event ScholarshipFrozen(uint256 indexed tokenId, uint256 currentScore);
     event ScholarshipUnfrozen(uint256 indexed tokenId, uint256 currentScore);
+    event ScholarshipDataCleanedUp(uint256 indexed tokenId);
     
     struct WithdrawalRecord {
         uint256 amount;
@@ -339,5 +340,73 @@ contract ScholarshipManager is IScholarshipManager, Ownable {
             timestamps[i] = scholarships[tokenId].withdrawalHistory[i].timestamp;
             feeAmounts[i] = withdrawalFees[tokenId][i]; // 0 if no fee recorded
         }
+    }
+    
+    // === SCHOLARSHIP DELETION FUNCTIONS ===
+    
+    /**
+     * @dev Checks if a scholarship can be deleted
+     * @param tokenId The ID of the scholarship NFT
+     * @return True if scholarship can be deleted (no funding, ratings, or withdrawals)
+     */
+    function canDeleteScholarship(uint256 tokenId) external view returns (bool) {
+        // Check if scholarship has any funding received
+        if (totalFundingReceived[tokenId] > 0) {
+            return false;
+        }
+        
+        // Check if scholarship has any withdrawal history
+        if (scholarships[tokenId].withdrawalHistory.length > 0) {
+            return false;
+        }
+        
+        // Check if scholarship has any ratings via ScoreManager
+        if (address(scoreManager) != address(0)) {
+            if (scoreManager.hasRatings(tokenId)) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @dev Cleans up all data associated with a scholarship
+     * @param tokenId The ID of the scholarship NFT
+     * @notice Only callable by Core contract
+     */
+    function cleanupScholarship(uint256 tokenId) external onlyCore {
+        // Remove from allScholarships array
+        for (uint256 i = 0; i < allScholarships.length; i++) {
+            if (allScholarships[i] == tokenId) {
+                allScholarships[i] = allScholarships[allScholarships.length - 1];
+                allScholarships.pop();
+                break;
+            }
+        }
+        
+        // Remove from student's scholarship list
+        address student = scholarships[tokenId].student;
+        uint256[] storage studentSchols = studentScholarships[student];
+        for (uint256 i = 0; i < studentSchols.length; i++) {
+            if (studentSchols[i] == tokenId) {
+                studentSchols[i] = studentSchols[studentSchols.length - 1];
+                studentSchols.pop();
+                break;
+            }
+        }
+        
+        // Clean up investor data (should be empty, but cleanup for safety)
+        delete scholarshipInvestors[tokenId];
+        // Note: investorContributions mapping will be cleaned automatically when investors array is deleted
+        delete totalFundingReceived[tokenId];
+        
+        // Clean up withdrawal fee data (should be empty, but cleanup for safety)
+        // Note: withdrawalFees mapping entries will be inaccessible after scholarship deletion
+        
+        // Delete the main scholarship data
+        delete scholarships[tokenId];
+        
+        emit ScholarshipDataCleanedUp(tokenId);
     }
 }

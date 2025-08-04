@@ -16,7 +16,9 @@ import {
   parseMetadata,
   fetchIpfsMetadata,
   convertIpfsToHttp,
-  ParsedMetadata
+  ParsedMetadata,
+  // New imports for freeze status
+  isScholarshipFrozen
 } from '@/helper';
 import ScholarshipFilter, { FilterOptions } from './ScholarshipFilter';
 import ScholarshipDetails from './ScholarshipDetails';
@@ -29,6 +31,7 @@ type Scholarship = {
   metadata: string;
   score: bigint;
   exists: boolean;
+  frozen: boolean; // New field for freeze status
 };
 
 type ScholarshipListProps = {
@@ -50,7 +53,8 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
     minBalance: '0',
     minScore: '0',
     sortBy: 'id',
-    sortOrder: 'desc'
+    sortOrder: 'desc',
+    freezeStatus: 'all'
   });
   const [isRefreshingData, setIsRefreshingData] = useState(false);
   
@@ -128,7 +132,8 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
               balance: scholarshipData.balance, // Real balance from contract
               metadata: scholarshipData.metadata,
               score: score || BigInt(0), // Ensure score is never undefined
-              exists: true
+              exists: true,
+              frozen: scholarshipData.frozen // Include freeze status
             };
           } catch (err) {
             console.error(`Error fetching scholarship ${id}:`, err);
@@ -219,6 +224,18 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
       result = result.filter(s => {
         const scoreValue = s.score ? Number(s.score) : 0;
         return scoreValue >= minScoreValue;
+      });
+    }
+    
+    // Filter by freeze status
+    if (filters.freezeStatus !== 'all') {
+      result = result.filter(s => {
+        if (filters.freezeStatus === 'frozen') {
+          return s.frozen === true;
+        } else if (filters.freezeStatus === 'active') {
+          return s.frozen === false;
+        }
+        return true;
       });
     }
     
@@ -362,13 +379,18 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
                 </span>
               </div>
               
-                <div className="absolute top-2 right-2">
-                  {isOwner ? (
+                <div className="absolute top-2 right-2 flex flex-col gap-1">
+                  {scholarship.frozen ? (
+                    <span className="bg-red-600 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                      <span>🧊</span>
+                      <span>Frozen</span>
+                    </span>
+                  ) : isOwner ? (
                     <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
                       Mine
                     </span>
                   ) : (
-                    <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded">
+                    <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
                       Available
                     </span>
                   )}
@@ -403,7 +425,11 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
                   
                   <div className="text-center">
                     <p className="text-xs text-gray-400">Score</p>
-                    <p className="text-sm font-medium text-yellow-400">
+                    <p className={`text-sm font-medium ${
+                      scholarship.score && Number(scholarship.score) / 100 < 3.0 
+                        ? 'text-red-400' 
+                        : 'text-yellow-400'
+                    }`}>
                       {scholarship.score ? (Number(scholarship.score) / 100).toFixed(1) : '0.0'}
                     </p>
                     <p className="text-xs text-gray-500">⭐ Rating</p>

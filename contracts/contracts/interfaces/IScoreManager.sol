@@ -48,4 +48,11 @@ interface IScoreManager {
      * @return scores Array of corresponding scores
      */
     function getTopRatedScholarships(uint256 count) external view returns (uint256[] memory tokenIds, uint256[] memory scores);
+    
+    /**
+     * @dev Checks if a scholarship has any ratings
+     * @param tokenId The ID of the scholarship NFT
+     * @return True if scholarship has any ratings
+     */
+    function hasRatings(uint256 tokenId) external view returns (bool);
 }

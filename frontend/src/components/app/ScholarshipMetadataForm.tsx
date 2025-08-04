@@ -5,6 +5,7 @@ import { upload } from 'thirdweb/storage';
 import { createThirdwebClient } from 'thirdweb';
 import { createScholarship } from '@/helper';
 import { useActiveAccount } from 'thirdweb/react';
+import { useRouter } from 'next/navigation';
 
 type ScholarshipMetadata = {
   name: string;
@@ -21,12 +22,14 @@ type ScholarshipMetadata = {
 type ScholarshipMetadataFormProps = {
   onMetadataGenerated: (metadata: ScholarshipMetadata, jsonString: string) => void;
   onCreateScholarship?: (metadata: ScholarshipMetadata, jsonString: string) => void;
+  onSuccessRedirect?: () => void;
   className?: string;
 };
 
 const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({ 
   onMetadataGenerated,
   onCreateScholarship,
+  onSuccessRedirect,
   className = '' 
 }) => {
   const [metadata, setMetadata] = useState<ScholarshipMetadata>({
@@ -35,8 +38,8 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
     image: '',
     attributes: [
       { trait_type: 'Field of Study', value: '' },
-      { trait_type: 'Degree', value: '' },
-      { trait_type: 'Year', value: '' },
+      { trait_type: 'Degree Level', value: '' },
+      { trait_type: 'Academic Status', value: '' },
       { trait_type: 'University or School', value: '' }
     ],
     contact: {
@@ -58,6 +61,9 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
 
   // Get connected wallet
   const account = useActiveAccount();
+  
+  // Next.js router for navigation
+  const router = useRouter();
 
   // Create Thirdweb client for IPFS
   const client = useMemo(() => createThirdwebClient({
@@ -215,7 +221,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
     if (!metadata.image) missingFields.push('Student Photo');
     if (!metadata.contact.email.trim()) missingFields.push('Email Contact');
     
-    // Check if at least 2 attributes are filled
+    // Check if at least 2 academic information fields are filled
     const filledAttributes = metadata.attributes.filter(attr => attr.value.trim() !== '');
     if (filledAttributes.length < 2) missingFields.push('At least 2 Academic Information fields');
     
@@ -332,13 +338,21 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
         onCreateScholarship(finalMetadata, jsonString);
       }
 
-      // Auto-close modal after success delay
+      // Auto-close modal after success delay and redirect
       setTimeout(() => {
         setShowConfirmModal(false);
         setTermsAccepted(false);
         setIsCreating(false);
         setCreateStatus(null);
-      }, 5000);
+        
+        // Redirect to scholarship list (/app)
+        if (onSuccessRedirect) {
+          onSuccessRedirect();
+        } else {
+          // Default redirect to /app
+          router.push('/app');
+        }
+      }, 5000); // Keep original 5-second delay
 
     } catch (error: any) {
       console.error('Error creating scholarship:', error);
@@ -457,7 +471,10 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
         </div>
         
         <div>
-          <h4 className="text-sm font-medium mb-2">Attributes</h4>
+          <h4 className="text-sm font-medium mb-2">Academic Information</h4>
+          <p className="text-xs text-gray-400 mb-3">
+            Fill in your academic details. For "Academic Status", you can specify your current year, semester, expected graduation, or enrollment status.
+          </p>
           <div className="space-y-3">
             {metadata.attributes.map((attr, index) => (
               <div key={index} className="flex items-center">
@@ -466,7 +483,13 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                   type="text"
                   value={attr.value}
                   onChange={(e) => handleAttributeChange(index, e.target.value)}
-                      placeholder={attr.trait_type === 'University or School' ? 'e.g., Harvard University, Jakarta High School' : `Enter ${attr.trait_type.toLowerCase()}`}
+                      placeholder={
+                    attr.trait_type === 'Field of Study' ? 'e.g., Computer Science, Medicine, Business, Art' :
+                    attr.trait_type === 'Degree Level' ? 'e.g., High School, Bachelor, Master, PhD, Diploma' :
+                    attr.trait_type === 'Academic Status' ? 'e.g., Year 2/4, Semester 5, Graduating 2025, Starting Sep 2024' :
+                    attr.trait_type === 'University or School' ? 'e.g., Harvard University, Jakarta High School' :
+                    `Enter ${attr.trait_type.toLowerCase()}`
+                  }
                   className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
@@ -619,7 +642,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
             
             {/* Attributes */}
             <div className="bg-gray-700/30 rounded p-2">
-              <h4 className="text-xs font-medium mb-2 text-gray-300">🎓 Academic Info</h4>
+              <h4 className="text-xs font-medium mb-2 text-gray-300">🎓 Academic Information</h4>
               {metadata.attributes.filter(attr => attr.value.trim() !== '').length > 0 ? (
                 <div className="space-y-1">
                   {metadata.attributes
@@ -632,7 +655,12 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-xs text-gray-500 italic">Fill attributes to see them here</div>
+                <div className="text-xs text-gray-500 italic">
+                  Fill academic information to see them here
+                  <div className="mt-1 text-gray-600 text-[10px]">
+                    Tip: For Academic Status, use formats like "Year 2/4", "Semester 5", "Graduating 2025", or "Starting Fall 2024"
+                  </div>
+                </div>
               )}
             </div>
             
@@ -839,7 +867,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                       <div className="mt-3 p-2 bg-green-800/30 rounded">
                         <p className="text-green-200 text-xs">
                           🎉 Your scholarship NFT has been created! You can now receive funding from investors.
-                          This modal will close automatically in a few seconds.
+                          This modal will close automatically and redirect you to the scholarship list.
                         </p>
                       </div>
                     )}
@@ -925,7 +953,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                         <span className="text-white">{metadata.contact.email || 'Not set'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Academic Info:</span>
+                        <span className="text-gray-400">Academic Information:</span>
                         <span className="text-white">
                           {metadata.attributes.filter(attr => attr.value.trim() !== '').length}/4 fields
                         </span>

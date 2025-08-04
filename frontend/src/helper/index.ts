@@ -17,6 +17,9 @@ export * from './utilityHelpers';
 export type {
     ScholarshipData,
     WithdrawalHistory,
+    DetailedWithdrawalHistory,
+    InvestorInfo,
+    ScholarshipFunding,
     CreateScholarshipParams,
     FundScholarshipParams,
     WithdrawFundsParams
@@ -40,7 +43,9 @@ export {
 export type {
     UpdateRewardRateParams,
     UpdateProtocolFeeParams,
-    UpdateUSDTContractParams
+    UpdateUSDTContractParams,
+    SetFrozenStatusParams,
+    UpdateFreezeStatusParams
 } from './adminHelpers';
 
 export type {
@@ -50,3 +55,38 @@ export type {
 } from './scoreHelpers';
 
 // Utility helpers provide formatting and validation functions
+
+// ===== NEW FEATURE EXPORTS =====
+
+// Export new investor tracking functions
+export {
+    getScholarshipInvestors,
+    getInvestorContribution,
+    getTotalScholarshipFunding,
+    getInvestorCount,
+    getScholarshipFundingInfo,
+    getDetailedInvestorInfo
+} from './scholarshipHelpers';
+
+// Export new freeze management functions
+export {
+    isScholarshipFrozen,
+    shouldScholarshipBeFrozen,
+    setScholarshipFrozenStatus,
+    updateScholarshipFreezeStatus,
+    getFreezeThreshold,
+    getBatchFreezeStatus
+} from './adminHelpers';
+
+// Export new enhanced withdrawal functions
+export {
+    getDetailedWithdrawalHistory,
+    getWithdrawalFee,
+    getWithdrawalStats
+} from './scholarshipHelpers';
+
+// Export scholarship deletion functions
+export {
+    canDeleteScholarship,
+    deleteScholarship
+} from './scholarshipHelpers';

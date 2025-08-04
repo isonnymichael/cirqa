@@ -23,7 +23,21 @@ import {
   convertIpfsToHttp,
   ParsedMetadata,
   RateScholarshipParams,
-  InvestorRating
+  InvestorRating,
+  // New imports for enhanced features
+  getScholarshipInvestors,
+  getDetailedInvestorInfo,
+  getScholarshipFundingInfo,
+  isScholarshipFrozen,
+  shouldScholarshipBeFrozen,
+  getDetailedWithdrawalHistory,
+  getWithdrawalStats,
+  ScholarshipFunding,
+  InvestorInfo,
+  DetailedWithdrawalHistory,
+  // Delete functionality
+  canDeleteScholarship,
+  deleteScholarship
 } from '@/helper';
 import FundScholarshipModal from './FundScholarshipModal';
 import WithdrawFundsModal from './WithdrawFundsModal';
@@ -47,6 +61,17 @@ type ScholarshipData = {
   };
   totalWithdrawn: bigint;
   exists: boolean;
+  // New fields for enhanced features
+  frozen: boolean;
+  fundingInfo?: ScholarshipFunding;
+  investors?: InvestorInfo[];
+  detailedWithdrawalHistory?: DetailedWithdrawalHistory;
+  withdrawalStats?: {
+    totalWithdrawals: number;
+    totalNetAmount: bigint;
+    totalFees: bigint;
+    averageFeeRate: number;
+  };
 };
 
 const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, onClose }) => {
@@ -68,6 +93,10 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
   const [cirqaBalance, setCirqaBalance] = useState<bigint>(BigInt(0));
   const [minRatingTokens, setMinRatingTokens] = useState<bigint>(BigInt(0));
   const [isWaitingForUpdate, setIsWaitingForUpdate] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [canDelete, setCanDelete] = useState<boolean | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const account = useActiveAccount();
 
@@ -88,13 +117,29 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
     setError(null);
     
     try {
-      // Fetch all scholarship data in parallel
-      const [scholarshipData, withdrawalHistory, score, stats, minTokens] = await Promise.all([
+      // Fetch all scholarship data in parallel (enhanced with new features)
+      const [
+        scholarshipData,
+        withdrawalHistory,
+        score,
+        stats,
+        minTokens,
+        // New data fetching
+        fundingInfo,
+        investors,
+        detailedWithdrawalHistory,
+        withdrawalStats
+      ] = await Promise.all([
         retryWithBackoff(() => getScholarshipData(scholarshipId)),
         retryWithBackoff(() => getWithdrawalHistory(scholarshipId)),
         retryWithBackoff(() => getScholarshipScore(scholarshipId)).catch(() => BigInt(0)), // Score might not exist
         retryWithBackoff(() => getScholarshipRatingStats(scholarshipId)).catch(() => ({ averageScore: 0, totalRatings: 0, totalTokensUsed: BigInt(0) })),
-        retryWithBackoff(() => getMinRatingTokens()).catch(() => BigInt(0))
+        retryWithBackoff(() => getMinRatingTokens()).catch(() => BigInt(0)),
+        // New enhanced data
+        retryWithBackoff(() => getScholarshipFundingInfo(scholarshipId)).catch(() => ({ totalFunding: BigInt(0), investorCount: 0, investors: [] })),
+        retryWithBackoff(() => getDetailedInvestorInfo(scholarshipId)).catch(() => []),
+        retryWithBackoff(() => getDetailedWithdrawalHistory(scholarshipId)).catch(() => ({ netAmounts: [], timestamps: [], feeAmounts: [] })),
+        retryWithBackoff(() => getWithdrawalStats(scholarshipId)).catch(() => ({ totalWithdrawals: 0, totalNetAmount: BigInt(0), totalFees: BigInt(0), averageFeeRate: 0 }))
       ]);
       
       // Set rating stats and min tokens
@@ -117,6 +162,19 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
         }
       }
 
+      // Check if scholarship can be deleted (only for owner)
+      if (account?.address && account.address.toLowerCase() === scholarshipData.student.toLowerCase()) {
+        try {
+          const canDeleteResult = await canDeleteScholarship(scholarshipId);
+          setCanDelete(canDeleteResult);
+        } catch (error) {
+          console.error('Error checking delete eligibility:', error);
+          setCanDelete(false);
+        }
+      } else {
+        setCanDelete(false);
+      }
+
       // Calculate total withdrawn
       const totalWithdrawn = withdrawalHistory.amounts.reduce((sum, amount) => sum + amount, BigInt(0));
 
@@ -128,7 +186,13 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
         score,
         withdrawalHistory,
         totalWithdrawn,
-        exists: true
+        exists: true,
+        // New enhanced fields
+        frozen: scholarshipData.frozen,
+        fundingInfo,
+        investors,
+        detailedWithdrawalHistory,
+        withdrawalStats
       });
 
       // Parse metadata
@@ -167,6 +231,18 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
     fetchScholarshipData();
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    console.log('🔄 Manually refreshing scholarship data...');
+    try {
+      await fetchScholarshipData();
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -195,6 +271,40 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
     
     console.log('🔄 Refreshing scholarship data...');
     fetchScholarshipData(); // Refresh data
+  };
+
+  const handleDeleteScholarship = async () => {
+    if (!account) {
+      setError('No account connected');
+      return;
+    }
+
+    setIsDeleting(true);
+    
+    try {
+      const result = await deleteScholarship({
+        tokenId: scholarshipId,
+        account
+      });
+
+      if (result.success) {
+        console.log('✅ Scholarship deleted successfully');
+        setShowDeleteModal(false);
+        
+        // Close the details view and refresh parent
+        onClose();
+        
+        // Optional: Show success message or redirect
+        console.log('🔄 Scholarship has been deleted');
+      } else {
+        setError(result.error || 'Failed to delete scholarship');
+      }
+    } catch (error: any) {
+      console.error('Error deleting scholarship:', error);
+      setError(error?.message || 'Unknown error occurred while deleting scholarship');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (loading) {
@@ -257,16 +367,69 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
         </span>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="cursor-pointer text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg"
-          aria-label="Close"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center space-x-2">
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing || loading}
+            className={`cursor-pointer p-2 rounded-lg transition-colors ${
+              isRefreshing || loading
+                ? 'text-gray-500 cursor-not-allowed'
+                : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'
+            }`}
+            aria-label="Refresh scholarship data"
+            title="Refresh scholarship data"
+          >
+            <svg 
+              className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="cursor-pointer text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg"
+            aria-label="Close"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {/* Freeze Status Warning */}
+      {scholarship.frozen && (
+        <div className="bg-red-900/30 border-2 border-red-600 rounded-lg p-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0">
+              <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-400 mb-2">🧊 Scholarship Frozen</h3>
+              <p className="text-red-300 text-sm mb-2">
+                This scholarship has been automatically frozen due to low performance score (below 3.0). 
+                Funding and withdrawals are currently disabled.
+              </p>
+              <div className="flex items-center space-x-4 text-xs">
+                <span className="text-red-400">
+                  Current Score: {ratingStats ? ratingStats.averageScore.toFixed(1) : '0.0'}/10
+                </span>
+                <span className="text-gray-400">
+                  Minimum Required: 3.0/10
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Student Information */}
@@ -567,6 +730,149 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
         )}
       </div>
 
+      {/* Investor Transparency Section */}
+      {scholarship.fundingInfo && scholarship.fundingInfo.investorCount > 0 && (
+        <div className="bg-gray-700/30 rounded-lg p-4 mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-purple-400">👥 Investor Transparency</h3>
+          
+          {/* Funding Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-gray-800 p-3 rounded-lg text-center">
+              <p className="text-sm text-gray-400 mb-1">Total Funding</p>
+              <p className="text-lg font-bold text-purple-400">
+                {formatCurrency(scholarship.fundingInfo.totalFunding, 6, '', 2)} USDT
+              </p>
+            </div>
+            <div className="bg-gray-800 p-3 rounded-lg text-center">
+              <p className="text-sm text-gray-400 mb-1">Number of Investors</p>
+              <p className="text-lg font-bold text-blue-400">
+                {scholarship.fundingInfo.investorCount}
+              </p>
+            </div>
+            <div className="bg-gray-800 p-3 rounded-lg text-center">
+              <p className="text-sm text-gray-400 mb-1">Average Contribution</p>
+              <p className="text-lg font-bold text-green-400">
+                {formatCurrency(
+                  scholarship.fundingInfo.totalFunding / BigInt(scholarship.fundingInfo.investorCount), 
+                  6, '', 2
+                )} USDT
+              </p>
+            </div>
+          </div>
+
+          {/* Investor List */}
+          {scholarship.investors && scholarship.investors.length > 0 && (
+            <div>
+              <h4 className="text-md font-semibold mb-3 text-gray-300">Individual Contributions</h4>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {scholarship.investors.map((investor, index) => (
+                  <div key={index} className="bg-gray-800 p-3 rounded-lg flex justify-between items-center">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-mono text-sm text-white break-all">
+                          {formatAddress(investor.address)}
+                        </p>
+                        {account?.address.toLowerCase() === investor.address.toLowerCase() && (
+                          <p className="text-xs text-blue-400">You</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-green-400">
+                        {formatCurrency(investor.contribution, 6, '', 2)} USDT
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {((Number(investor.contribution) / Number(scholarship.fundingInfo!.totalFunding)) * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Enhanced Withdrawal Analytics */}
+      {scholarship.withdrawalStats && scholarship.withdrawalStats.totalWithdrawals > 0 && (
+        <div className="bg-gray-700/30 rounded-lg p-4 mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-orange-400">📊 Withdrawal Analytics</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="bg-gray-800 p-3 rounded-lg text-center">
+              <p className="text-sm text-gray-400 mb-1">Total Withdrawals</p>
+              <p className="text-lg font-bold text-orange-400">
+                {scholarship.withdrawalStats.totalWithdrawals}
+              </p>
+            </div>
+            <div className="bg-gray-800 p-3 rounded-lg text-center">
+              <p className="text-sm text-gray-400 mb-1">Net Amount</p>
+              <p className="text-lg font-bold text-green-400">
+                {formatCurrency(scholarship.withdrawalStats.totalNetAmount, 6, '', 2)} USDT
+              </p>
+            </div>
+            <div className="bg-gray-800 p-3 rounded-lg text-center">
+              <p className="text-sm text-gray-400 mb-1">Total Fees</p>
+              <p className="text-lg font-bold text-red-400">
+                {formatCurrency(scholarship.withdrawalStats.totalFees, 6, '', 2)} USDT
+              </p>
+            </div>
+            <div className="bg-gray-800 p-3 rounded-lg text-center">
+              <p className="text-sm text-gray-400 mb-1">Avg Fee Rate</p>
+              <p className="text-lg font-bold text-yellow-400">
+                {scholarship.withdrawalStats.averageFeeRate.toFixed(2)}%
+              </p>
+            </div>
+          </div>
+
+          {/* Detailed Withdrawal History with Fees */}
+          {scholarship.detailedWithdrawalHistory && scholarship.detailedWithdrawalHistory.netAmounts.length > 0 && (
+            <div>
+              <h4 className="text-md font-semibold mb-3 text-gray-300">Detailed Transaction History</h4>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {scholarship.detailedWithdrawalHistory.netAmounts.map((netAmount, index) => {
+                  const timestamp = scholarship.detailedWithdrawalHistory!.timestamps[index];
+                  const feeAmount = scholarship.detailedWithdrawalHistory!.feeAmounts[index];
+                  const grossAmount = netAmount + feeAmount;
+                  const feeRate = Number(feeAmount) / Number(grossAmount) * 100;
+                  const date = new Date(Number(timestamp) * 1000);
+                  
+                  return (
+                    <div key={index} className="bg-gray-800 p-4 rounded-lg border border-gray-600">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg font-bold text-green-400">
+                            {formatCurrency(netAmount, 6, '', 2)} USDT
+                          </span>
+                          <span className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded-full">
+                            Net Amount
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-red-400">
+                            Fee: {formatCurrency(feeAmount, 6, '', 2)} USDT ({feeRate.toFixed(2)}%)
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Gross: {formatCurrency(grossAmount, 6, '', 2)} USDT
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-gray-400">
+                        <span>{date.toLocaleString()}</span>
+                        <span>Transaction #{index + 1}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-center lg:space-y-0">
         <div className="text-xs text-gray-500 order-2 lg:order-1 text-center lg:text-left">
@@ -577,9 +883,15 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
           {!isOwner && (
             <button
               onClick={() => setShowFundModal(true)}
-              className="cursor-pointer px-3 md:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm md:text-base w-full sm:w-auto"
+              disabled={scholarship.frozen}
+              className={`px-3 md:px-4 py-2 rounded-md transition-colors text-sm md:text-base w-full sm:w-auto ${
+                scholarship.frozen 
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+              }`}
+              title={scholarship.frozen ? 'Cannot fund frozen scholarship' : 'Fund this scholarship'}
             >
-              💰 Fund Scholarship
+              {scholarship.frozen ? '🧊 Funding Disabled' : '💰 Fund Scholarship'}
             </button>
           )}
           
@@ -604,9 +916,31 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
           {isOwner && scholarship.balance > BigInt(0) && (
             <button
               onClick={() => setShowWithdrawModal(true)}
-              className="cursor-pointer px-3 md:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm md:text-base w-full sm:w-auto"
+              disabled={scholarship.frozen}
+              className={`px-3 md:px-4 py-2 rounded-md transition-colors text-sm md:text-base w-full sm:w-auto ${
+                scholarship.frozen 
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                  : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
+              }`}
+              title={scholarship.frozen ? 'Cannot withdraw from frozen scholarship' : 'Withdraw funds'}
             >
-              💸 Withdraw Funds
+              {scholarship.frozen ? '🧊 Withdrawals Disabled' : '💸 Withdraw Funds'}
+            </button>
+          )}
+
+          {/* Delete Button - Show if owner and can delete */}
+          {isOwner && canDelete && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              disabled={isDeleting}
+              className={`px-3 md:px-4 py-2 rounded-md transition-colors text-sm md:text-base w-full sm:w-auto ${
+                isDeleting 
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                  : 'bg-red-600 text-white hover:bg-red-700 cursor-pointer'
+              }`}
+              title="Delete this scholarship permanently"
+            >
+              {isDeleting ? '🗑️ Deleting...' : '🗑️ Delete Scholarship'}
             </button>
           )}
           
@@ -637,6 +971,91 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-4 md:p-6 max-w-md w-full border border-red-600">
+            <div className="flex justify-between items-start mb-3 md:mb-4">
+              <h2 className="text-lg md:text-xl font-bold text-red-400">🗑️ Delete Scholarship</h2>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="cursor-pointer text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <div className="bg-red-900/20 border border-red-600 rounded-lg p-3 mb-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-red-400 font-semibold text-sm">Warning: This action is permanent!</span>
+                </div>
+                <p className="text-red-300 text-xs">
+                  This will permanently delete your scholarship NFT and all associated data. This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <p className="text-gray-300">
+                  <strong>Scholarship ID:</strong> #{scholarship.id}
+                </p>
+                <p className="text-gray-300">
+                  <strong>Student:</strong> {parsedMetadata?.name || 'Anonymous Student'}
+                </p>
+                <p className="text-gray-300">
+                  <strong>Current Balance:</strong> {formatCurrency(scholarship.balance, 6, '', 2)} USDT
+                </p>
+              </div>
+
+              <div className="mt-4 p-3 bg-gray-700/30 rounded-lg">
+                <h4 className="text-sm font-semibold text-gray-300 mb-2">✅ Requirements Met:</h4>
+                <ul className="text-xs text-gray-400 space-y-1">
+                  <li>• No funding received</li>
+                  <li>• No ratings given</li>
+                  <li>• No withdrawals made</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="cursor-pointer px-3 md:px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors text-sm md:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteScholarship}
+                disabled={isDeleting}
+                className={`px-3 md:px-4 py-2 rounded-md transition-colors text-sm md:text-base ${
+                  isDeleting 
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                    : 'bg-red-600 text-white hover:bg-red-700 cursor-pointer'
+                }`}
+              >
+                {isDeleting ? (
+                  <div className="flex items-center space-x-2">
+                    <Spinner size="sm" />
+                    <span>Deleting...</span>
+                  </div>
+                ) : (
+                  'Delete Permanently'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

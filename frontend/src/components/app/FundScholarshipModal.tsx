@@ -19,6 +19,7 @@ type Scholarship = {
   balance: bigint;
   metadata: string;
   exists: boolean;
+  frozen?: boolean; // Optional for backwards compatibility
 };
 
 type FundScholarshipModalProps = {
@@ -164,6 +165,22 @@ const FundScholarshipModal: React.FC<FundScholarshipModalProps> = ({
               </svg>
           </button>
         </div>
+
+        {/* Freeze Warning */}
+        {scholarship.frozen && (
+          <div className="bg-red-900/30 border border-red-600 rounded-lg p-3 mb-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-red-400">🧊</span>
+              <div>
+                <p className="text-red-400 font-semibold text-sm">Scholarship is Frozen</p>
+                <p className="text-red-300 text-xs">
+                  This scholarship cannot be funded due to low performance score.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isSuccess ? (
           <div className="text-center py-4 md:py-6">
             <div className="text-green-500 text-lg md:text-xl mb-2">✓</div>
@@ -176,7 +193,51 @@ const FundScholarshipModal: React.FC<FundScholarshipModalProps> = ({
             </div>
             <p className="text-gray-400 text-xs md:text-sm mt-2">Tokens will be credited to your wallet</p>
           </div>
+        ) : scholarship.frozen ? (
+          // Frozen scholarship - show disabled form
+          <div>
+            <div className="mb-3 md:mb-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-2">
+                <label htmlFor="amount" className="block text-xs md:text-sm font-medium text-gray-500">
+                  Amount (USDT)
+                </label>
+                <span className="text-xs text-gray-500">
+                  Funding Disabled
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  id="amount"
+                  value=""
+                  placeholder="Funding disabled for frozen scholarship"
+                  className="w-full p-2 bg-gray-600 border border-gray-500 rounded-md text-gray-400 text-sm md:text-base cursor-not-allowed"
+                  disabled={true}
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1 break-all">
+                Student: {scholarship.student.slice(0, 6)}...{scholarship.student.slice(-4)}
+              </p>
+            </div>
+
+            <div className="mb-3 md:mb-4 p-2 md:p-3 bg-gray-700/30 border border-gray-600 rounded-md">
+              <p className="text-gray-400 text-xs md:text-sm">
+                ℹ️ This scholarship cannot be funded because it has been frozen due to low performance score.
+              </p>
+            </div>
+
+            <div className="flex justify-end mt-4 md:mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className="cursor-pointer px-3 md:px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors text-sm md:text-base"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         ) : (
+          // Normal form for unfrozen scholarships
           <form onSubmit={handleSubmit}>
             <div className="mb-3 md:mb-4">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-2">
