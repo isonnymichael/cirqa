@@ -184,7 +184,8 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
   }, [metadata]);
 
   const jsonString = useMemo(() => {
-    return JSON.stringify(finalMetadata, null, 2);
+    // return JSON.stringify(finalMetadata, null, 2); // Commented for performance
+    return '';
   }, [finalMetadata]);
     
   // Auto-trigger callback when metadata changes
@@ -268,30 +269,30 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
         files: [metadataToUpload]
       });
 
-      console.log('IPFS Upload Result - Raw response:', uploadResult);
-      console.log('IPFS Upload Result - Response type:', typeof uploadResult);
-      if (typeof uploadResult === 'string' || Array.isArray(uploadResult)) {
-        console.log('IPFS Upload Result - Response length:', uploadResult.length);
-      }
+      // console.log('IPFS Upload Result - Raw response:', uploadResult);
+      // console.log('IPFS Upload Result - Response type:', typeof uploadResult);
+      // if (typeof uploadResult === 'string' || Array.isArray(uploadResult)) {
+      //   console.log('IPFS Upload Result - Response length:', uploadResult.length);
+      // }
 
       // Handle both string and array responses from Thirdweb upload
       let metadataUri: string;
       if (typeof uploadResult === 'string') {
         // Direct string response
         metadataUri = uploadResult;
-        console.log('IPFS Upload - Direct string response:', metadataUri);
+        // console.log('IPFS Upload - Direct string response:', metadataUri);
       } else if (Array.isArray(uploadResult) && (uploadResult as string[]).length > 0) {
         // Array response
         metadataUri = (uploadResult as string[])[0];
-        console.log('IPFS Upload - Array response, first item:', metadataUri);
+        // console.log('IPFS Upload - Array response, first item:', metadataUri);
       } else {
         throw new Error(`Unexpected IPFS upload response format: ${JSON.stringify(uploadResult)}`);
       }
 
-      console.log('IPFS Upload - Extracted URI:', metadataUri);
-      console.log('IPFS Upload - URI type:', typeof metadataUri);
-      console.log('IPFS Upload - URI length:', metadataUri?.length);
-      console.log('IPFS Upload - URI starts with ipfs:', metadataUri?.startsWith?.('ipfs://'));
+      // console.log('IPFS Upload - Extracted URI:', metadataUri);
+      // console.log('IPFS Upload - URI type:', typeof metadataUri);
+      // console.log('IPFS Upload - URI length:', metadataUri?.length);
+      // console.log('IPFS Upload - URI starts with ipfs:', metadataUri?.startsWith?.('ipfs://'));
       
       // Validate URI before proceeding
       if (!metadataUri || typeof metadataUri !== 'string' || metadataUri.length < 10) {
@@ -299,18 +300,18 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
       }
       
       if (!metadataUri.startsWith('ipfs://')) {
-        console.warn('IPFS URI does not start with ipfs://, received:', metadataUri);
+        // console.warn('IPFS URI does not start with ipfs://, received:', metadataUri);
         // If it's just the hash, prepend ipfs://
         if (metadataUri.length > 40 && !metadataUri.includes('://')) {
           const fixedUri = `ipfs://${metadataUri}`;
-          console.log('Fixed URI:', fixedUri);
+          // console.log('Fixed URI:', fixedUri);
           metadataUri = fixedUri;
         } else {
           throw new Error(`Invalid IPFS URI format: ${metadataUri}. Expected ipfs:// URL.`);
         }
       }
       
-      console.log('Final metadata URI to be sent to blockchain:', metadataUri);
+      // console.log('Final metadata URI to be sent to blockchain:', metadataUri);
 
       // Step 2: Create scholarship NFT on blockchain
       setCreateStatus({
@@ -324,7 +325,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
         account
       });
 
-      console.log('Scholarship created with transaction:', txHash);
+      // console.log('Scholarship created with transaction:', txHash);
 
       // Step 3: Success
       setCreateStatus({
@@ -455,8 +456,8 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                     alt="Preview"
                     className="w-full h-32 object-contain bg-gray-900 rounded-lg"
                     onError={(e) => {
-                      console.error('Failed to load form image:', metadata.image);
-                      console.log('Converted URL:', convertIpfsToHttp(metadata.image));
+                      // console.error('Failed to load form image:', metadata.image);
+                      // console.log('Converted URL:', convertIpfsToHttp(metadata.image));
                     }}
                   />
                   <button
@@ -611,8 +612,8 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
                   alt="Student"
                   className="w-full h-24 object-contain bg-gray-900 rounded"
                   onError={(e) => {
-                    console.error('Failed to load image:', metadata.image);
-                    console.log('Converted URL:', convertIpfsToHttp(metadata.image));
+                    // console.error('Failed to load image:', metadata.image);
+                    // console.log('Converted URL:', convertIpfsToHttp(metadata.image));
                   }}
                 />
               ) : (
@@ -711,7 +712,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
             </div>
 
             {/* JSON Preview in Live Preview */}
-            <div className="bg-gray-900/50 rounded p-2 border border-gray-600">
+            {/* <div className="bg-gray-900/50 rounded p-2 border border-gray-600">
               <div className="flex justify-between items-center mb-2">
                 <h4 className="text-xs font-medium text-gray-300">📋 Generated JSON</h4>
                 <button
@@ -726,7 +727,8 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
               <pre className="bg-gray-900 rounded p-2 text-xs text-green-400 overflow-x-auto max-h-64 overflow-y-auto">
                 {jsonString}
               </pre>
-            </div>
+            </div> */}
+
           </div>
         </div>
       </div>
