@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import ScholarshipList from '@/components/app/ScholarshipList';
 import ScholarshipStats from '@/components/app/ScholarshipStats';
 import NotificationBanner from '@/components/app/NotificationBanner';
 import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react';
 import { kiiTestnet } from '@/lib/chain';
+import Spinner from '@/app/Spinner';
 
 export default function AppPage() {
   const account = useActiveAccount();
@@ -18,13 +19,13 @@ export default function AppPage() {
 
   // Handle view mode changes from ScholarshipList
   const handleViewModeChange = useCallback((detailView: boolean) => {
-    console.log(`🔄 View mode changed: ${detailView ? 'Detail View' : 'List View'}`);
+    // console.log(`🔄 View mode changed: ${detailView ? 'Detail View' : 'List View'}`);
     setIsDetailView(detailView);
   }, []);
 
   // Handle stats refresh requests
   const handleRefreshStats = useCallback(() => {
-    console.log('📊 Refreshing global statistics...');
+    // console.log('📊 Refreshing global statistics...');
     setStatsRefreshTrigger(prev => prev + 1);
   }, []);
 
@@ -75,10 +76,19 @@ export default function AppPage() {
               </div>
             )}
             <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-              <ScholarshipList 
-                onViewModeChange={handleViewModeChange}
-                onRefreshStats={handleRefreshStats}
-              />
+              <Suspense fallback={
+                <div className="flex justify-center items-center h-64">
+                  <div className="text-center">
+                    <Spinner size="lg" />
+                    <p className="text-gray-400 mt-4">Loading scholarships...</p>
+                  </div>
+                </div>
+              }>
+                <ScholarshipList 
+                  onViewModeChange={handleViewModeChange}
+                  onRefreshStats={handleRefreshStats}
+                />
+              </Suspense>
             </div>
           </div>
 

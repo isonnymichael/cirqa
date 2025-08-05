@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   getAllScholarships, 
   getScholarshipsByStudent, 
@@ -47,6 +48,8 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedScholarshipId, setSelectedScholarshipId] = useState<number | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [ipfsMetadataCache, setIpfsMetadataCache] = useState<Record<string, ParsedMetadata>>({});
   const [filters, setFilters] = useState<FilterOptions>({
     showOwned: false,
@@ -60,15 +63,33 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
   
   const account = useActiveAccount();
   
+  // Check for scholarship ID in URL params on component mount and handle URL changes
+  useEffect(() => {
+    const scholarshipId = searchParams.get('scholarship');
+    if (scholarshipId) {
+      const id = parseInt(scholarshipId);
+      if (!isNaN(id) && id !== selectedScholarshipId) {
+        setSelectedScholarshipId(id);
+        onViewModeChange?.(true);
+      }
+    } else {
+      // If no scholarship ID in URL, ensure we're in list view
+      if (selectedScholarshipId !== null) {
+        setSelectedScholarshipId(null);
+        onViewModeChange?.(false);
+      }
+    }
+  }, [searchParams]); // Remove onViewModeChange and selectedScholarshipId from deps to avoid loops
+  
   // Utility function for blockchain update delay
   const waitForBlockchainUpdate = async (delayMs: number = 1500) => {
-    console.log('⏳ Allowing time for blockchain data to propagate...');
-    console.log(`⏰ List refresh delay duration: ${delayMs}ms`);
+    // console.log('⏳ Allowing time for blockchain data to propagate...');
+    // console.log(`⏰ List refresh delay duration: ${delayMs}ms`);
     setIsRefreshingData(true);
     
     await new Promise(resolve => setTimeout(resolve, delayMs));
     
-    console.log('✅ Blockchain propagation wait completed');
+    // console.log('✅ Blockchain propagation wait completed');
     setIsRefreshingData(false);
   };
   
@@ -121,7 +142,7 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
             const [scholarshipData, score] = await Promise.all([
               retryWithBackoff(() => getScholarshipData(id)),
               retryWithBackoff(() => getScholarshipScore(id)).catch((err) => {
-                console.log(`Score not available for scholarship ${id}:`, err);
+                // console.log(`Score not available for scholarship ${id}:`, err);
                 return BigInt(0);
               })
             ]);
@@ -173,21 +194,25 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
 
   const handleScholarshipClick = (scholarshipId: number) => {
     setSelectedScholarshipId(scholarshipId);
+    // Update URL with scholarship ID
+    router.push(`/app?scholarship=${scholarshipId}`, { scroll: false });
     // Notify parent that we're entering detail view
     onViewModeChange?.(true);
   };
 
   const handleBackToList = async () => {
     setSelectedScholarshipId(null);
+    // Remove scholarship ID from URL
+    router.push('/app', { scroll: false });
     // Notify parent that we're returning to list view
     onViewModeChange?.(false);
     
     // Refresh data when returning from details (user might have performed operations)
-    console.log('🔄 Refreshing list after returning from details...');
+    // console.log('🔄 Refreshing list after returning from details...');
     await refreshScholarshipsWithDelay();
     
     // Also refresh global statistics
-    console.log('📊 Refreshing global statistics...');
+    // console.log('📊 Refreshing global statistics...');
     onRefreshStats?.();
   };
 
