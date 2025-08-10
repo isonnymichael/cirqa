@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cirqa - Decentralized Borrowing and Lending",
-  description: "A decentralized borrowing and lending application built on the KiiChain network",
+  title: "Cirqa - Decentralized Scholarship Platform",
+  description: "A decentralized scholarship platform built on the KiiChain network",
 };
 
 export default function RootLayout({
