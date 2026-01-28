@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { download } from 'thirdweb/storage';
+import { createThirdwebClient } from 'thirdweb';
 import { useActiveAccount } from 'thirdweb/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
@@ -62,6 +64,9 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
   const [isRefreshingData, setIsRefreshingData] = useState(false);
   
   const account = useActiveAccount();
+  const client = useMemo(() => createThirdwebClient({
+      clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID!,
+  }), []);
   
   // Check for scholarship ID in URL params on component mount and handle URL changes
   useEffect(() => {
@@ -106,7 +111,7 @@ const ScholarshipList: React.FC<ScholarshipListProps> = ({
       }
       
       // Trigger async fetch (fire and forget)
-      fetchIpfsMetadata(basicParsed.ipfsUrl, scholarshipId).then(fetchedMetadata => {
+      fetchIpfsMetadata(download, client, basicParsed.ipfsUrl!, scholarshipId).then(fetchedMetadata => {
         setIpfsMetadataCache(prev => ({
           ...prev,
           [basicParsed.ipfsUrl!]: fetchedMetadata

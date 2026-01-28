@@ -114,7 +114,7 @@ export function parseMetadata(metadataString: string): ParsedMetadata {
             },
             documents: (parsed.documents || []).map((doc: any) => ({
                 name: doc.name || '',
-                url: convertIpfsToHttp(doc.url || ''),
+                url: doc.url,
                 type: doc.type || 'Document'
             }))
         };
@@ -122,7 +122,7 @@ export function parseMetadata(metadataString: string): ParsedMetadata {
         // If not JSON, treat as IPFS URL or simple string
         if (metadataString.startsWith('ipfs://')) {
             // This is an IPFS URI pointing to metadata, fetch it
-            const httpUrl = convertIpfsToHttp(metadataString);
+            const httpUrl = metadataString;
             console.log('IPFS metadata URL converted to:', httpUrl);
             
             // Return placeholder - caller should handle async fetching
@@ -160,10 +160,12 @@ export function parseMetadata(metadataString: string): ParsedMetadata {
 /**
  * Fetch IPFS metadata from HTTP gateway
  */
-export async function fetchIpfsMetadata(ipfsUrl: string, scholarshipId: number): Promise<ParsedMetadata> {
+export async function fetchIpfsMetadata(download: any, client: any, ipfsUrl: string, scholarshipId: number): Promise<ParsedMetadata> {
     try {
-        console.log('Fetching IPFS metadata from:', ipfsUrl);
-        const response = await fetch(ipfsUrl);
+        const response = await download({
+            client,
+            uri: ipfsUrl,
+        });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);

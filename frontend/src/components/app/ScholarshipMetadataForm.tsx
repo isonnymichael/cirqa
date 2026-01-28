@@ -76,7 +76,7 @@ const ScholarshipMetadataForm: React.FC<ScholarshipMetadataFormProps> = ({
       // Extract CID from ipfs://CID or ipfs://CID/path
       const ipfsPath = uri.replace('ipfs://', '');
       return `https://ipfs.io/ipfs/${ipfsPath}`;
-    }
+    }a
     return uri;
   };
 

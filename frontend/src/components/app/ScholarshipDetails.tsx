@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { download } from 'thirdweb/storage';
+import { createThirdwebClient } from 'thirdweb';
 import { useActiveAccount } from 'thirdweb/react';
 import { 
   getScholarshipMetadata,
@@ -99,6 +101,10 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
   const [isDeleting, setIsDeleting] = useState(false);
   
   const account = useActiveAccount();
+  // Create Thirdweb client for IPFS
+  const client = useMemo(() => createThirdwebClient({
+    clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID!,
+  }), []);
 
   // Utility function for blockchain update delay with UI feedback
   const waitForBlockchainUpdate = async (operation: string, delayMs: number = 2500) => {
@@ -197,11 +203,11 @@ const ScholarshipDetails: React.FC<ScholarshipDetailsProps> = ({ scholarshipId, 
 
       // Parse metadata
       const basicParsed = parseMetadata(scholarshipData.metadata);
-      
+      console.log('Basic parsed metadata:', basicParsed);
       if (basicParsed.ipfsUrl) {
         // Need to fetch from IPFS
         try {
-          const fetchedMetadata = await fetchIpfsMetadata(basicParsed.ipfsUrl, scholarshipId);
+          const fetchedMetadata = await fetchIpfsMetadata(download, client, basicParsed.ipfsUrl, scholarshipId);
           setParsedMetadata(fetchedMetadata);
         } catch (error) {
           console.error('Error fetching IPFS metadata:', error);
