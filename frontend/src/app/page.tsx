@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 import { FaLock, FaChartLine, FaCode } from "react-icons/fa";
 import { RiMoneyDollarCircleFill, RiSecurePaymentFill, RiCommunityFill, RiUserStarFill, RiExchangeDollarFill, RiHandCoinFill } from "react-icons/ri";
 import { MdSecurity, MdOutlinePublic } from "react-icons/md";
 import React, { useState } from 'react';
-
-
 export default function Home() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [showSampleMetadata, setShowSampleMetadata] = useState(false);
@@ -294,9 +293,7 @@ export default function Home() {
         </section>
       </main>
       
-      {/* Standalone CTA Section - Outside of other sections */}
       <div className="py-10 sm:py-16 px-4 bg-gradient-to-r from-purple-600 via-accent to-blue-600 relative overflow-hidden">
-        {/* Animated elements */}
         <div className="absolute inset-0">
           <div className="absolute top-0 left-0 w-full h-full bg-[url('/globe.svg')] bg-no-repeat bg-center opacity-10"></div>
           <div className="absolute top-0 left-0 w-full h-full">
@@ -322,9 +319,8 @@ export default function Home() {
         </div>
       </div>
       
-
+      <Footer />
       
-      {/* Add custom animations */}
       <style jsx global>{`
         @keyframes float {
           0%, 100% { transform: translateY(0); }
